@@ -6,8 +6,13 @@ import os
 # 이 파일(config.py)이 있는 폴더 = 프로젝트 루트
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# ── 데이터 폴더 (XML 파일이 위치하는 루트) ─────────────
-DATA_DIR = os.path.join(BASE_DIR, "data")
+# ── 프로젝트명 (data/ 바로 아래 폴더명) ───────────────
+# 실제 구조: data/{PROJECT_NAME}/{wafer_id}/{timestamp}/*.xml
+# 예)        data/HY202103/D08/20190526_082853/*.xml
+PROJECT_NAME = "HY202103"
+
+# ── 데이터 루트 폴더 ──────────────────────────────────
+DATA_DIR = os.path.join(BASE_DIR, "data", PROJECT_NAME)
 
 # ── 결과 저장 루트 폴더 ────────────────────────────────
 RES_DIR = os.path.join(BASE_DIR, "res")

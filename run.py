@@ -27,7 +27,7 @@ import os
 # 프로젝트 루트를 sys.path 에 추가 (절대 import 보장)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config import DATA_DIR, RES_DIR, DEVICE_CONFIG, WAFER_IDS
+from config import DATA_DIR, RES_DIR, DEVICE_CONFIG, WAFER_IDS, PROJECT_NAME
 from src.analyzer import GPDOAnalyzer
 
 
@@ -42,7 +42,7 @@ RUNNER_REGISTRY: dict[str, type] = {
 }
 
 
-def run_device_wafer(device_type: str, wafer_id: str) -> list | None:
+def run_device_wafer(device_type: str, wafer_id: str) -> dict | None:
     """
     디바이스 타입 × 웨이퍼 ID 1쌍에 대한 파이프라인 실행.
 
@@ -53,7 +53,7 @@ def run_device_wafer(device_type: str, wafer_id: str) -> list | None:
 
     Returns
     -------
-    results 리스트 또는 실패 시 None
+    { timestamp: results_list } dict 또는 실패 시 None
     """
     cfg = DEVICE_CONFIG.get(device_type)
     if cfg is None:
@@ -65,17 +65,17 @@ def run_device_wafer(device_type: str, wafer_id: str) -> list | None:
         print(f"⚠  '{device_type}' 에 대응하는 분석기가 아직 구현되지 않았습니다.")
         return None
 
-    # res/{wafer_id}-{save_root}/  예: res/D07-GPDO/
+    # res/{wafer_id}-{save_root}/  예: res/D08-GPDO/
     save_dir = os.path.join(RES_DIR, f"{wafer_id}-{cfg['save_root']}")
 
     print(f"\n{'='*60}")
     print(f"  디바이스: {device_type}  |  웨이퍼: {wafer_id}")
-    print(f"  데이터 경로 : {DATA_DIR}")
-    print(f"  저장 경로   : {save_dir}")
+    print(f"  데이터 경로 : data/{PROJECT_NAME}/{wafer_id}/{{timestamp}}/")
+    print(f"  저장 경로   : res/{wafer_id}-{cfg['save_root']}/{{timestamp}}/")
     print(f"{'='*60}")
 
     try:
-        analyzer = runner_cls(gpdo_dir=DATA_DIR, wafer_id=wafer_id)
+        analyzer = runner_cls(data_dir=DATA_DIR, wafer_id=wafer_id)
         results  = analyzer.run(save_dir=save_dir)
         return results
     except FileNotFoundError as e:
@@ -129,11 +129,17 @@ def main(targets: list[str] | None = None) -> dict[str, dict[str, list]]:
     for dtype in targets:
         cfg = DEVICE_CONFIG.get(dtype, {})
         for wafer_id in plan[dtype]:
-            save_subdir = f"{wafer_id}-{cfg.get('save_root', dtype)}"
+            save_root   = cfg.get('save_root', dtype)
+            save_subdir = f"{wafer_id}-{save_root}"
             if wafer_id in all_results.get(dtype, {}):
-                n = len(all_results[dtype][wafer_id])
-                print(f"  ✅ {dtype:6s} / {wafer_id}  →  {n}개 다이 처리  "
+                ts_dict = all_results[dtype][wafer_id]   # {timestamp: results}
+                n_ts    = len(ts_dict)
+                n_dies  = sum(len(v) for v in ts_dict.values())
+                print(f"  ✅ {dtype:6s} / {wafer_id}  →  "
+                      f"{n_ts}개 측정시간  |  총 {n_dies}개 다이  "
                       f"|  res/{save_subdir}/")
+                for ts in sorted(ts_dict):
+                    print(f"       📁 {ts}  →  {len(ts_dict[ts])}개 다이")
             else:
                 print(f"  ❌ {dtype:6s} / {wafer_id}  →  처리 실패 또는 건너뜀")
     print(f"{'='*60}\n")
