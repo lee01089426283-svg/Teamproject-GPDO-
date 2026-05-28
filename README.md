@@ -14,10 +14,20 @@ project/
 ├── .gitattributes              # 줄바꿈 통일 설정 (LF)
 ├── data/
 │   ├── .gitignore              # XML 파일 Git 추적 제외
-│   └── *.xml                   # 측정 데이터 (Git 미추적)
+│   └── HY202103/               # 프로젝트명 폴더 (PROJECT_NAME)
+│       ├── D07/
+│       │   └── 20190526_082853/
+│       │       └── *.xml
+│       ├── D08/
+│       │   └── 20190526_082853/
+│       │       └── *.xml
+│       ├── D23/
+│       └── D24/
 ├── res/                        # 분석 결과 PNG 자동 저장
 │   ├── D07-GPDO/
+│   │   └── 20190526_082853/
 │   ├── D08-GPDO/
+│   │   └── 20190526_082853/
 │   ├── D23-GPDO/
 │   └── D24-GPDO/
 └── src/
@@ -46,14 +56,19 @@ pip install numpy scipy matplotlib lxml
 
 ## 데이터 준비
 
-`data/` 폴더에 XML 파일을 위치시킵니다.
-하위 폴더 구조가 있어도 재귀 탐색하므로 그대로 넣으면 됩니다.
+`data/` 아래에 **프로젝트명 → 웨이퍼 ID → 측정시간** 3단계 구조로 XML을 위치시킵니다.
 
 ```
 data/
-├── HY202103_D07__0_0__LION1_DCM_GPDO.xml
-├── HY202103_D08__0_0__LION1_DCM_GPDO.xml
-└── ...
+└── HY202103/               ← config.py의 PROJECT_NAME
+    ├── D07/
+    │   ├── 20190526_082853/
+    │   │   └── *.xml
+    │   └── 20190620_134500/    ← 측정시간이 여러 개여도 자동 분류
+    │       └── *.xml
+    └── D08/
+        └── 20190526_082853/
+            └── *.xml
 ```
 
 > XML 파일은 `data/.gitignore` 에 의해 Git에 추적되지 않습니다.
@@ -66,7 +81,7 @@ data/
 # 전체 디바이스 × 전체 웨이퍼 처리
 python run.py
 
-# GPDO 만 처리
+# GPDO 만 처리 (전체 웨이퍼)
 python run.py GPDO
 
 # 복수 디바이스 선택
@@ -77,24 +92,29 @@ python run.py GPDO LMZC
 
 ## 결과물
 
-실행 후 `res/` 폴더에 웨이퍼·디바이스별로 분류되어 저장됩니다.
+실행 후 `res/` 폴더에 **웨이퍼 → 디바이스 → 측정시간** 순으로 분류되어 저장됩니다.
 
 ```
 res/
 ├── D07-GPDO/
-│   ├── D07_(0,0)_analysis.png      # 다이 단위 6-패널 분석 그래프
-│   ├── D07_(0,1)_analysis.png
-│   ├── ...
-│   ├── heatmap_Iph.png             # 웨이퍼 히트맵 (Photo Current)
-│   ├── heatmap_n_d.png             # 웨이퍼 히트맵 (Ideality Factor)
-│   ├── heatmap_Rs_d.png            # 웨이퍼 히트맵 (Series Resistance)
-│   ├── heatmap_R_resp.png          # 웨이퍼 히트맵 (Responsivity)
-│   ├── heatmap_r2_fwd.png          # 웨이퍼 히트맵 (R² Dark fwd)
-│   └── heatmap_r2_lgt.png          # 웨이퍼 히트맵 (R² Light)
+│   └── 20190526_082853/
+│       ├── D07_(0,0)_analysis.png      # 다이 단위 6-패널 분석 그래프
+│       ├── D07_(0,1)_analysis.png
+│       ├── ...
+│       ├── heatmap_Iph.png             # 웨이퍼 히트맵 (Photo Current)
+│       ├── heatmap_n_d.png             # 웨이퍼 히트맵 (Ideality Factor)
+│       ├── heatmap_Rs_d.png            # 웨이퍼 히트맵 (Series Resistance)
+│       ├── heatmap_R_resp.png          # 웨이퍼 히트맵 (Responsivity)
+│       ├── heatmap_r2_fwd.png          # 웨이퍼 히트맵 (R² Dark fwd)
+│       └── heatmap_r2_lgt.png          # 웨이퍼 히트맵 (R² Light)
 ├── D08-GPDO/
+│   └── 20190526_082853/
 ├── D23-GPDO/
 └── D24-GPDO/
 ```
+
+측정시간 폴더는 `YYYYMMDD_HHMMSS` 형식을 자동으로 인식합니다.
+같은 웨이퍼에 측정시간이 여러 개 있어도 각각 별도 폴더로 분리 저장됩니다.
 
 ### 다이 단위 6-패널 그래프
 
@@ -111,9 +131,16 @@ res/
 
 ## 설정 변경
 
-### 웨이퍼 추가 / 제거
+### 프로젝트명 변경
 
-`config.py` 의 `WAFER_IDS` 한 줄만 수정합니다.
+`config.py` 의 `PROJECT_NAME` 한 줄만 수정합니다.
+
+```python
+# config.py
+PROJECT_NAME = "HY202103"   # data/ 바로 아래 폴더명과 일치시킬 것
+```
+
+### 웨이퍼 추가 / 제거
 
 ```python
 # config.py
@@ -170,7 +197,10 @@ DEVICE_CONFIG = {
 ### `src/analyzer/gpdo_analyzer.py`
 
 파싱 → 피팅 → 시각화 → 히트맵 전체 파이프라인을 통합합니다.
-XML 필터링 기준은 ① GPDO 구조 검증 → ② Wafer ID 일치 순으로 적용됩니다.
+
+- XML 수집 경로: `data/{PROJECT_NAME}/{wafer_id}/**/*.xml`
+- 측정시간 폴더(`YYYYMMDD_HHMMSS`)를 경로에서 자동 추출해 그룹핑
+- 측정시간 패턴이 없는 경우 `unknown/` 폴더로 자동 분류
 
 ---
 
