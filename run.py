@@ -5,9 +5,17 @@
 """
 실행 방법
 ---------
-    python run.py              # config.py 기준 전체 디바이스 처리
-    python run.py GPDO         # GPDO 만 처리
-    python run.py GPDO LMZC    # 복수 디바이스 선택 처리
+    python run.py                   # 전체 디바이스 × 전체 웨이퍼 처리
+    python run.py GPDO              # GPDO 만 (전체 웨이퍼)
+    python run.py GPDO LMZC        # 복수 디바이스 선택 (전체 웨이퍼)
+
+결과 폴더 구조
+--------------
+    res/
+    ├── D07-GPDO/
+    ├── D08-GPDO/
+    ├── D23-GPDO/
+    └── D24-GPDO/
 """
 
 import matplotlib
@@ -19,7 +27,7 @@ import os
 # 프로젝트 루트를 sys.path 에 추가 (절대 import 보장)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config import DATA_DIR, RES_DIR, DEVICE_CONFIG
+from config import DATA_DIR, RES_DIR, DEVICE_CONFIG, WAFER_IDS
 from src.analyzer import GPDOAnalyzer
 
 
@@ -34,13 +42,14 @@ RUNNER_REGISTRY: dict[str, type] = {
 }
 
 
-def run_device(device_type: str) -> list | None:
+def run_device_wafer(device_type: str, wafer_id: str) -> list | None:
     """
-    단일 디바이스 타입에 대한 파이프라인 실행.
+    디바이스 타입 × 웨이퍼 ID 1쌍에 대한 파이프라인 실행.
 
     Parameters
     ----------
     device_type : DEVICE_CONFIG 의 키 (예: 'GPDO')
+    wafer_id    : 처리할 웨이퍼 ID (예: 'D07')
 
     Returns
     -------
@@ -56,8 +65,8 @@ def run_device(device_type: str) -> list | None:
         print(f"⚠  '{device_type}' 에 대응하는 분석기가 아직 구현되지 않았습니다.")
         return None
 
-    wafer_id   = cfg["wafer_id"]
-    save_dir   = os.path.join(RES_DIR, cfg["save_subdir"])
+    # res/{wafer_id}-{save_root}/  예: res/D07-GPDO/
+    save_dir = os.path.join(RES_DIR, f"{wafer_id}-{cfg['save_root']}")
 
     print(f"\n{'='*60}")
     print(f"  디바이스: {device_type}  |  웨이퍼: {wafer_id}")
@@ -73,13 +82,13 @@ def run_device(device_type: str) -> list | None:
         print(f"\n❌ 파일을 찾을 수 없습니다:\n   {e}")
         return None
     except Exception as e:
-        print(f"\n❌ '{device_type}' 처리 중 오류 발생:\n   {e}")
+        print(f"\n❌ '{device_type} / {wafer_id}' 처리 중 오류 발생:\n   {e}")
         return None
 
 
-def main(targets: list[str] | None = None) -> dict[str, list]:
+def main(targets: list[str] | None = None) -> dict[str, dict[str, list]]:
     """
-    지정된 디바이스 타입(들)을 순차 실행.
+    지정된 디바이스 타입 × 전체 웨이퍼를 순차 실행.
 
     Parameters
     ----------
@@ -88,30 +97,45 @@ def main(targets: list[str] | None = None) -> dict[str, list]:
 
     Returns
     -------
-    {device_type: results_list} dict
+    { device_type: { wafer_id: results_list } } 중첩 dict
     """
     if targets is None:
         targets = list(DEVICE_CONFIG.keys())
 
-    print(f"\n🚀 처리 대상: {targets}")
-
-    all_results: dict[str, list] = {}
+    # 각 디바이스의 웨이퍼 목록 결정
+    plan: dict[str, list[str]] = {}
     for dtype in targets:
-        res = run_device(dtype)
-        if res is not None:
-            all_results[dtype] = res
+        cfg = DEVICE_CONFIG.get(dtype, {})
+        plan[dtype] = cfg.get("wafer_ids") or WAFER_IDS
+
+    total_jobs = sum(len(v) for v in plan.values())
+    print(f"\n🚀 처리 대상: {targets}")
+    print(f"   웨이퍼 목록: {WAFER_IDS}")
+    print(f"   총 {total_jobs}개 작업 예정")
+
+    all_results: dict[str, dict[str, list]] = {}
+
+    for dtype in targets:
+        all_results[dtype] = {}
+        for wafer_id in plan[dtype]:
+            res = run_device_wafer(dtype, wafer_id)
+            if res is not None:
+                all_results[dtype][wafer_id] = res
 
     # ── 최종 요약 ─────────────────────────────────────
     print(f"\n{'='*60}")
     print("  📋 실행 요약")
     print(f"{'='*60}")
     for dtype in targets:
-        if dtype in all_results:
-            n = len(all_results[dtype])
-            sub = DEVICE_CONFIG[dtype]["save_subdir"]
-            print(f"  ✅ {dtype:6s}  →  {n}개 다이 처리  |  res/{sub}/")
-        else:
-            print(f"  ❌ {dtype:6s}  →  처리 실패 또는 건너뜀")
+        cfg = DEVICE_CONFIG.get(dtype, {})
+        for wafer_id in plan[dtype]:
+            save_subdir = f"{wafer_id}-{cfg.get('save_root', dtype)}"
+            if wafer_id in all_results.get(dtype, {}):
+                n = len(all_results[dtype][wafer_id])
+                print(f"  ✅ {dtype:6s} / {wafer_id}  →  {n}개 다이 처리  "
+                      f"|  res/{save_subdir}/")
+            else:
+                print(f"  ❌ {dtype:6s} / {wafer_id}  →  처리 실패 또는 건너뜀")
     print(f"{'='*60}\n")
 
     return all_results
