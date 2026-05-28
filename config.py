@@ -6,11 +6,26 @@ import os
 # 이 파일(config.py)이 있는 폴더 = 프로젝트 루트
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# XML 데이터가 있는 폴더 (프로젝트 루트 기준 상대경로)
-GPDO_DIR = os.path.join(BASE_DIR, "XMLfile")
+# ── 데이터 폴더 (XMLfile 하위 구조 자동 탐색) ──────────
+DATA_DIR = os.path.join(BASE_DIR, "data")
 
-# 결과 이미지 저장 폴더 (프로젝트 루트 기준 상대경로)
-SAVE_DIR = os.path.join(BASE_DIR, "results")
+# ── 결과 저장 루트 폴더 ────────────────────────────────
+RES_DIR = os.path.join(BASE_DIR, "res")
 
-# 분석 대상 웨이퍼 ID
-WAFER_ID = "D08"
+# ── 디바이스 타입별 설정 ──────────────────────────────
+# key   : 디바이스 타입 식별자 (XML TestSite 속성에서 검색)
+# value : (save_subdir, wafer_id)
+DEVICE_CONFIG = {
+    "GPDO": dict(
+        save_subdir = "D08-GPDO",
+        wafer_id    = "D08",
+    ),
+    "LMZC": dict(
+        save_subdir = "D08-LMZC",
+        wafer_id    = "D08",
+    ),
+    "LMZO": dict(
+        save_subdir = "D08-LMZO",
+        wafer_id    = "D08",
+    ),
+}
