@@ -15,7 +15,13 @@
     ├── D07-GPDO/
     ├── D08-GPDO/
     ├── D23-GPDO/
-    └── D24-GPDO/
+    ├── D24-GPDO/
+    └── csv/
+        ├── D07_Result.csv
+        ├── D08_Result.csv
+        ├── D23_Result.csv
+        ├── D24_Result.csv
+        └── Total_Result.csv
 """
 
 import matplotlib
@@ -29,6 +35,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import DATA_DIR, RES_DIR, DEVICE_CONFIG, WAFER_IDS, PROJECT_NAME
 from src.analyzer import GPDOAnalyzer
+from src.tocsv.gpdo_csv import save_results
 
 
 # ══════════════════════════════════════════════════════
@@ -75,8 +82,13 @@ def run_device_wafer(device_type: str, wafer_id: str) -> dict | None:
     print(f"{'='*60}")
 
     try:
-        analyzer = runner_cls(data_dir=DATA_DIR, wafer_id=wafer_id)
-        results  = analyzer.run(save_dir=save_dir)
+        analyzer    = runner_cls(data_dir=DATA_DIR, wafer_id=wafer_id)
+        results     = analyzer.run(save_dir=save_dir)
+
+        # ── CSV 저장 ──────────────────────────────────
+        csv_dir = os.path.join(RES_DIR, "csv")
+        save_results(results, wafer_id=wafer_id, base_dir=csv_dir)
+
         return results
     except FileNotFoundError as e:
         print(f"\n❌ 파일을 찾을 수 없습니다:\n   {e}")

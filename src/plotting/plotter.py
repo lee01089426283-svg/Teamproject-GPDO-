@@ -5,7 +5,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.fitting import FittingEngine
+from src.parser.fitting import FittingEngine
 
 
 class Plotter:
@@ -39,7 +39,8 @@ class Plotter:
     @classmethod
     def plot(cls, raw: dict, ref_r: dict, df: dict, dr: dict,
              lf: dict, pc: dict, resp: dict,
-             save_dir: str = None) -> None:
+             save_dir: str = None, wafer_id: str = "D08",
+             fname: str = None) -> None:
         """
         6-패널 분석 그래프를 생성하고 PNG로 저장.
 
@@ -77,7 +78,7 @@ class Plotter:
         fig, axes = plt.subplots(3, 2, figsize=(20, 15))
         plt.subplots_adjust(hspace=0.50, wspace=0.32)
         fig.suptitle(
-            f"HY202103 – D08 ({col},{row})  GPDO_PDK\n"
+            f"{fname or f'{wafer_id} ({col},{row})'}  GPDO_PDK\n"
             f"Fiber: {raw['fiber_dbm']:.2f} dBm  |  "
             f"Pin: {resp['P_in_dbm']:.2f} dBm  |  "
             f"R = {R:.3f} A/W",
@@ -94,7 +95,10 @@ class Plotter:
         # ── 저장 ──────────────────────────────────────
         if save_dir:
             os.makedirs(save_dir, exist_ok=True)
-            fpath = os.path.join(save_dir, f"D08_({col},{row})_analysis.png")
+            # XML 파일명 그대로 PNG로 저장
+            png_name = (fname.replace(".xml", ".png")
+                        if fname else f"{wafer_id}_({col},{row})_analysis.png")
+            fpath = os.path.join(save_dir, png_name)
             fig.savefig(fpath, dpi=150, bbox_inches="tight")
             print(f"       💾 저장: {fpath}")
         plt.close(fig)
