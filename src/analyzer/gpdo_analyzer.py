@@ -8,7 +8,7 @@ import numpy as np
 from collections import defaultdict
 
 from src.parser   import GPDOParser
-from src.fitting  import FittingEngine
+from src.parser.fitting import FittingEngine
 from src.plotting import Plotter, HeatmapPlotter
 
 
@@ -161,6 +161,8 @@ class GPDOAnalyzer:
                     d, d['ref_r'], d['df'], d['dr'],
                     d['lf'], d['pc'], d['resp'],
                     save_dir=ts_save_dir,
+                    wafer_id=self.wafer_id,
+                    fname=d['fname'],
                 )
             except Exception as e:
                 print(f"         ⚠ 오류: {e}")
