@@ -128,8 +128,16 @@ class FittingEngine:
 
         # 선형 구간 초기 추정 (0.05 ~ 0.35 V)
         ml  = (V_f > 0.05) & (V_f < 0.35) & (I_f > 0)
-        sl  = np.polyfit(V_f[ml], np.log(I_f[ml]), 1)
-        n0  = np.clip(1 / (sl[0] * cls.VT), 1.0, 2.0)
+        # 빈 배열 방어: 조건에 맞는 데이터가 없으면 범위를 넓혀서 재시도
+        if ml.sum() < 2:
+            ml = (V_f > 0.0) & (I_f > 0)
+        if ml.sum() < 2:
+            # 그래도 없으면 기본값 사용
+            n0 = 1.5
+            sl = [1.0 / (n0 * cls.VT), np.log(1e-10)]
+        else:
+            sl  = np.polyfit(V_f[ml], np.log(I_f[ml]), 1)
+            n0  = np.clip(1 / (sl[0] * cls.VT), 1.0, 2.0)
 
         try:
             popt, _ = curve_fit(
