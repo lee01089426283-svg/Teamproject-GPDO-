@@ -18,8 +18,6 @@ COLUMNS = [
     "Iph",
     "n_d",
     "R_resp",
-    "r2_fwd",
-    "r2_photo",
 ]
 
 
@@ -36,8 +34,6 @@ def _extract_row(result: dict, wafer_id: str, timestamp: str) -> dict:
         "Iph"       : result.get("Iph",       np.nan),
         "n_d"       : result.get("n_d",       np.nan),
         "R_resp"    : result.get("R_resp",     np.nan),
-        "r2_fwd"    : result.get("r2_fwd",    np.nan),
-        "r2_photo"  : result.get("r2_photo",  np.nan),
     }
 
 
