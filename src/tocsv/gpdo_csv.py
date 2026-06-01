@@ -13,13 +13,13 @@ COLUMNS = [
     "col",
     "row",
     "lc_wl",
+    "peak_wl",
     "fiber_dbm",
     "Iph",
     "n_d",
-    "Rs_d",
     "R_resp",
     "r2_fwd",
-    "r2_lgt",
+    "r2_photo",
 ]
 
 
@@ -31,13 +31,13 @@ def _extract_row(result: dict, wafer_id: str, timestamp: str) -> dict:
         "col"       : result.get("col",       np.nan),
         "row"       : result.get("row",       np.nan),
         "lc_wl"     : result.get("lc_wl",     np.nan),
+        "peak_wl"   : result.get("peak_wl",   np.nan),
         "fiber_dbm" : result.get("fiber_dbm", np.nan),
         "Iph"       : result.get("Iph",       np.nan),
         "n_d"       : result.get("n_d",       np.nan),
-        "Rs_d"      : result.get("Rs_d",      np.nan),
         "R_resp"    : result.get("R_resp",     np.nan),
         "r2_fwd"    : result.get("r2_fwd",    np.nan),
-        "r2_lgt"    : result.get("r2_lgt",    np.nan),
+        "r2_photo"  : result.get("r2_photo",  np.nan),
     }
 
 
@@ -78,7 +78,6 @@ def save_results(all_results: dict, wafer_id: str,
     total_csv = os.path.join(base_dir, "Total_Result.csv")
     if os.path.exists(total_csv):
         df_existing = pd.read_csv(total_csv, encoding="utf-8-sig")
-        # 같은 wafer_id 데이터는 덮어쓰고 나머지는 유지
         df_existing = df_existing[df_existing["wafer_id"] != wafer_id]
         df_total = pd.concat([df_existing, df], ignore_index=True)
     else:

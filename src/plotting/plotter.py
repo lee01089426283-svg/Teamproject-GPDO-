@@ -136,14 +136,13 @@ class Plotter:
     @staticmethod
     def _ptxt_dark(df: dict, dr: dict) -> str:
         return (f"$I_0$={df['I0']:.2e} A\n$n$={df['n']:.3f}\n"
-                f"$R_s$={df['Rs']:.2f} $\\Omega$\n"
                 f"$R^2$(fwd)={df['r2']:.4f}\n"
-                f"$b$={dr['b']:.3f}\n$R^2$(rev)={dr['r2']:.4f}")
+                f"$R^2$(rev)={dr['r2']:.4f}")
 
     @staticmethod
     def _ptxt_light(lf: dict) -> str:
         return (f"$I_0$={lf['I0']:.2e} A\n$n$={lf['n']:.3f}\n"
-                f"$R_s$={lf['Rs']:.2f} $\\Omega$\n$R^2$={lf['r2']:.4f}")
+                f"$R^2$={lf['r2']:.4f}")
 
     @staticmethod
     def _ptxt_photo(Iph: float, R: float) -> str:

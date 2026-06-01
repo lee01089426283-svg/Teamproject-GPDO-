@@ -30,6 +30,12 @@ matplotlib.use("Agg")   # GUI 없이 파일로만 저장
 import sys
 import os
 
+# Windows 터미널 CP949 환경에서 UTF-8 출력 강제
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 # 프로젝트 루트를 sys.path 에 추가 (절대 import 보장)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
