@@ -1,4 +1,4 @@
-# src/analyzer/__init__.py
 from .gpdo_analyzer import GPDOAnalyzer
+from .mzm_analyzer  import MZMAnalyzer
 
-__all__ = ["GPDOAnalyzer"]
+__all__ = ["GPDOAnalyzer", "MZMAnalyzer"]
