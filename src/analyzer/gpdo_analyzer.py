@@ -81,7 +81,7 @@ class GPDOAnalyzer:
 
         for ts in timestamps:
             ts_dir      = os.path.join(self.wafer_dir, ts)
-            ts_png      = os.path.join(save_dir, ts, "png")
+            ts_png      = os.path.join(save_dir, ts)
             ts_heatmap  = os.path.join(save_dir, ts, "heatmap")
             results = self._process_timestamp(ts_dir, ts_png)
             if results:

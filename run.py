@@ -78,13 +78,13 @@ def run_device_wafer(device_type: str, wafer_id: str) -> dict | None:
         print(f"⚠  '{device_type}' 에 대응하는 분석기가 아직 구현되지 않았습니다.")
         return None
 
-    # res/{wafer_id}-{save_root}/  예: res/D08-GPDO/
-    save_dir = os.path.join(RES_DIR, f"{wafer_id}-{cfg['save_root']}")
+    # res/png/{wafer_id}-{save_root}/  예: res/png/D08-GPDO/
+    save_dir = os.path.join(RES_DIR, "png", f"{wafer_id}-{cfg['save_root']}")
 
     print(f"\n{'='*60}")
     print(f"  디바이스: {device_type}  |  웨이퍼: {wafer_id}")
     print(f"  데이터 경로 : data/{PROJECT_NAME}/{wafer_id}/{{timestamp}}/")
-    print(f"  저장 경로   : res/{wafer_id}-{cfg['save_root']}/{{timestamp}}/")
+    print(f"  저장 경로   : res/png/{wafer_id}-{cfg['save_root']}/{{timestamp}}/")
     print(f"{'='*60}")
 
     try:
@@ -155,7 +155,7 @@ def main(targets: list[str] | None = None) -> dict[str, dict[str, list]]:
                 n_dies  = sum(len(v) for v in ts_dict.values())
                 print(f"  ✅ {dtype:6s} / {wafer_id}  →  "
                       f"{n_ts}개 측정시간  |  총 {n_dies}개 다이  "
-                      f"|  res/{save_subdir}/")
+                      f"|  res/png/{save_subdir}/")
                 for ts in sorted(ts_dict):
                     print(f"       📁 {ts}  →  {len(ts_dict[ts])}개 다이")
             else:
