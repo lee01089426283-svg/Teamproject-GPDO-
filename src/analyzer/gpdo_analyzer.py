@@ -8,7 +8,7 @@ import numpy as np
 from collections import defaultdict
 
 from src.parser   import GPDOParser
-from src.parser.fitting import FittingEngine
+from src.fitting import FittingEngine
 from src.plotting import Plotter, HeatmapPlotter
 
 

@@ -23,23 +23,36 @@ project/
 │       │       └── *.xml
 │       ├── D23/
 │       └── D24/
-├── res/                        # 분석 결과 PNG 자동 저장
+├── res/                        # 분석 결과 자동 저장
 │   ├── D07-GPDO/
 │   │   └── 20190526_082853/
 │   ├── D08-GPDO/
 │   │   └── 20190526_082853/
 │   ├── D23-GPDO/
-│   └── D24-GPDO/
+│   ├── D24-GPDO/
+│   └── csv/                    # CSV 결과 저장
+│       ├── D07_Result.csv
+│       ├── D08_Result.csv
+│       ├── D23_Result.csv
+│       ├── D24_Result.csv
+│       └── Total_Result.csv
 └── src/
-    ├── parser/
-    │   └── gpdo_parser.py      # XML 파싱
     ├── fitting/
-    │   └── fitting_engine.py   # 피팅 모델 및 연산
+    │   ├── fitting_engine.py   # 피팅 모델 및 연산
+    │   └── __init__.py
+    ├── parser/
+    │   ├── gpdo_parser.py      # XML 파싱
+    │   └── __init__.py
     ├── plotting/
     │   ├── plotter.py          # 다이 단위 6-패널 그래프
-    │   └── heatmap_plotter.py  # 웨이퍼 히트맵
-    └── analyzer/
-        └── gpdo_analyzer.py    # 전체 파이프라인 통합
+    │   ├── heatmap_plotter.py  # 웨이퍼 히트맵
+    │   └── __init__.py
+    ├── analyzer/
+    │   ├── gpdo_analyzer.py    # 전체 파이프라인 통합
+    │   └── __init__.py
+    └── tocsv/
+        ├── gpdo_csv.py         # GPDO 분석 결과 CSV 저장
+        └── __init__.py
 ```
 
 ---
@@ -49,7 +62,7 @@ project/
 **Python 3.10 이상** 권장
 
 ```bash
-pip install numpy scipy matplotlib lxml
+pip install numpy scipy matplotlib lxml pandas
 ```
 
 ---
@@ -96,10 +109,10 @@ python run.py GPDO LMZC
 
 ```
 res/
-├── D07-GPDO/
+├── D08-GPDO/
 │   └── 20190526_082853/
-│       ├── D07_(0,0)_analysis.png      # 다이 단위 6-패널 분석 그래프
-│       ├── D07_(0,1)_analysis.png
+│       ├── HY202103_D08_(0,0)_LION1_DCM_GPDO.png   # XML 파일명 그대로 저장
+│       ├── HY202103_D08_(0,1)_LION1_DCM_GPDO.png
 │       ├── ...
 │       ├── heatmap_Iph.png             # 웨이퍼 히트맵 (Photo Current)
 │       ├── heatmap_n_d.png             # 웨이퍼 히트맵 (Ideality Factor)
@@ -107,14 +120,34 @@ res/
 │       ├── heatmap_R_resp.png          # 웨이퍼 히트맵 (Responsivity)
 │       ├── heatmap_r2_fwd.png          # 웨이퍼 히트맵 (R² Dark fwd)
 │       └── heatmap_r2_lgt.png          # 웨이퍼 히트맵 (R² Light)
-├── D08-GPDO/
-│   └── 20190526_082853/
 ├── D23-GPDO/
-└── D24-GPDO/
+├── D24-GPDO/
+└── csv/
+    ├── D07_Result.csv      # 웨이퍼별 분석 결과
+    ├── D08_Result.csv
+    ├── D23_Result.csv
+    ├── D24_Result.csv
+    └── Total_Result.csv    # 전체 통합 결과
 ```
 
 측정시간 폴더는 `YYYYMMDD_HHMMSS` 형식을 자동으로 인식합니다.
 같은 웨이퍼에 측정시간이 여러 개 있어도 각각 별도 폴더로 분리 저장됩니다.
+
+### CSV 컬럼
+
+| 컬럼 | 설명 |
+|------|------|
+| wafer_id | 웨이퍼 ID (D07, D08 등) |
+| timestamp | 측정시간 폴더명 |
+| col / row | 다이 위치 |
+| lc_wl | 단일 파장 (nm) |
+| fiber_dbm | 파이버 출력 (dBm) |
+| Iph | 광전류 (A) |
+| n_d | 이상계수 n |
+| Rs_d | 직렬저항 Rs (Ω) |
+| R_resp | 응답도 (A/W) |
+| r2_fwd | 순방향 피팅 R² |
+| r2_lgt | 광전류 피팅 R² |
 
 ### 다이 단위 6-패널 그래프
 
@@ -179,7 +212,7 @@ DEVICE_CONFIG = {
 | 메서드 | 설명 |
 |--------|------|
 | `fit_reference` | Reference Spectrum 12차 다항식 피팅 |
-| `fit_dark_fwd` | 순방향 Dark Current 피팅 (Shockley + Rs) |
+| `fit_dark_fwd` | 순방향 Dark Current 피팅 (Shockley + Rs, 빈 배열 방어 처리) |
 | `fit_dark_rev` | 역방향 Dark Current 피팅 (Power-law) |
 | `fit_light` | Light Current 전 구간 피팅 |
 | `calc_photo_current` | Light − Dark 차감으로 Iph 추출 |
@@ -188,6 +221,7 @@ DEVICE_CONFIG = {
 ### `src/plotting/plotter.py`
 
 다이 1개의 분석 결과를 3행 2열 6-패널 PNG로 저장합니다.
+PNG 파일명은 원본 XML 파일명을 그대로 사용합니다.
 
 ### `src/plotting/heatmap_plotter.py`
 
@@ -201,6 +235,13 @@ DEVICE_CONFIG = {
 - XML 수집 경로: `data/{PROJECT_NAME}/{wafer_id}/**/*.xml`
 - 측정시간 폴더(`YYYYMMDD_HHMMSS`)를 경로에서 자동 추출해 그룹핑
 - 측정시간 패턴이 없는 경우 `unknown/` 폴더로 자동 분류
+
+### `src/tocsv/gpdo_csv.py`
+
+GPDO 분석 결과를 CSV로 저장합니다.
+
+- 웨이퍼별 CSV: `res/csv/{wafer_id}_Result.csv`
+- 전체 통합 CSV: `res/csv/Total_Result.csv` (실행할 때마다 누적 업데이트)
 
 ---
 
@@ -228,8 +269,9 @@ git commit -m "chore: reset git cache and reapply .gitattributes"
 ## 새 디바이스 타입 추가 방법
 
 1. `src/analyzer/` 에 새 분석기 클래스 작성 (GPDOAnalyzer 참고)
-2. `config.py` 의 `DEVICE_CONFIG` 에 항목 추가
-3. `run.py` 의 `RUNNER_REGISTRY` 에 등록
+2. `src/tocsv/` 에 새 CSV 저장 모듈 작성 (gpdo_csv.py 참고)
+3. `config.py` 의 `DEVICE_CONFIG` 에 항목 추가
+4. `run.py` 의 `RUNNER_REGISTRY` 에 등록
 
 ```python
 # run.py

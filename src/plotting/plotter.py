@@ -5,7 +5,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.parser.fitting import FittingEngine
+from src.fitting import FittingEngine
 
 
 class Plotter:
