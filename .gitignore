@@ -1,3 +1,4 @@
 # Data folder ignores
 data/
 res/
+.idea/
