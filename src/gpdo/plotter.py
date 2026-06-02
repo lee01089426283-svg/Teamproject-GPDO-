@@ -1,11 +1,11 @@
 # ══════════════════════════════════════════════════════
-# src/plotting/plotter.py  –  다이 단위 6-패널 그래프
+# src/gpdo/plotter.py  –  다이 단위 6-패널 그래프
 # ══════════════════════════════════════════════════════
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.fitting import FittingEngine
+from src.gpdo.fitting import FittingEngine
 
 
 class Plotter:

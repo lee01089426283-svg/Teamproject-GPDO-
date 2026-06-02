@@ -1,5 +1,5 @@
 # ══════════════════════════════════════════════════════
-# src/plotting/heatmap_plotter.py  –  웨이퍼 히트맵 시각화
+# src/common/heatmap_plotter.py  –  웨이퍼 히트맵 시각화
 # ══════════════════════════════════════════════════════
 import os
 import numpy as np

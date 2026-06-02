@@ -1,5 +1,5 @@
 # ══════════════════════════════════════════════════════
-# src/tocsv/gpdo_csv.py  –  GPDO 분석 결과 CSV 저장
+# src/gpdo/csv.py  –  GPDO 분석 결과 CSV 저장
 # ══════════════════════════════════════════════════════
 import os
 import numpy as np
