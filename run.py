@@ -8,8 +8,9 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import DATA_DIR, RES_DIR, DEVICE_CONFIG, WAFER_IDS, PROJECT_NAME
-from src.analyzer import GPDOAnalyzer, MZMAnalyzer
-from src.tocsv.gpdo_csv import save_results
+from src.gpdo import GPDOAnalyzer
+from src.mzm import MZMAnalyzer
+from src.gpdo.csv import save_results
 
 RUNNER_REGISTRY: dict[str, type] = {
     "GPDO": GPDOAnalyzer,

@@ -1,5 +1,5 @@
 # ══════════════════════════════════════════════════════
-# src/fitting/fitting_engine.py  –  피팅 모델 정의 + 피팅 수행
+# src/gpdo/fitting.py  –  피팅 모델 정의 + 피팅 수행
 # ══════════════════════════════════════════════════════
 import numpy as np
 from scipy.optimize import curve_fit

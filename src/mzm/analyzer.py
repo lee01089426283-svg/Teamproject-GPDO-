@@ -6,11 +6,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from config import DATA_DIR, RES_DIR, PROJECT_NAME, WAFER_IDS
-from src.fitting.mzm_fitting import (
+from src.mzm.fitting import (
     parse_array, fit_polynomials, remove_residual_baseline,
     fit_mzi, fit_iv,
 )
-from src.tocsv.mzm_csv import generate_csv, generate_total_csv
+from src.mzm.csv import generate_csv, generate_total_csv
 
 
 def _load_root(xml_file: str):

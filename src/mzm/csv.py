@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ET
 import pandas as pd
 
 from config import PROJECT_NAME, DATA_DIR, RES_DIR, WAFER_IDS
-from src.fitting.mzm_fitting import parse_xml
+from src.mzm.fitting import parse_xml
 
 COLUMNS_ORDER = [
     'Lot', 'Wafer', 'Mask', 'Testsite', 'Name', 'Date',

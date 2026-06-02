@@ -1,5 +1,5 @@
 # ══════════════════════════════════════════════════════
-# src/parser/gpdo_parser.py  –  XML 파싱
+# src/gpdo/parser.py  –  XML 파싱
 # ══════════════════════════════════════════════════════
 import os
 import numpy as np

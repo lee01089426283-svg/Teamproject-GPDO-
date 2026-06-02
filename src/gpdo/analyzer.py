@@ -4,7 +4,7 @@
 import os
 import numpy as np
 
-from src.parser.gpdo_parser import GPDOParser
+from src.gpdo.parser import GPDOParser
 
 
 def _calc_r2_photo(V_light: "np.ndarray", I_photo: "np.ndarray") -> float:
@@ -20,9 +20,9 @@ def _calc_r2_photo(V_light: "np.ndarray", I_photo: "np.ndarray") -> float:
     ss_res = float(np.sum((y - y_hat) ** 2))
     ss_tot = float(np.sum((y - y.mean()) ** 2))
     return float(1 - ss_res / ss_tot) if ss_tot != 0 else float("nan")
-from src.fitting.fitting_engine import FittingEngine
-from src.plotting.plotter import Plotter
-from src.plotting.heatmap_plotter import HeatmapPlotter
+from src.gpdo.fitting import FittingEngine
+from src.gpdo.plotter import Plotter
+from src.heatmap_plotter import HeatmapPlotter
 
 
 class GPDOAnalyzer:
