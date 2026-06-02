@@ -1,4 +1,4 @@
-# src/fitting/__init__.py
 from .fitting_engine import FittingEngine
+from . import mzm_fitting
 
-__all__ = ["FittingEngine"]
+__all__ = ["FittingEngine", "mzm_fitting"]
