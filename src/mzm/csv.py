@@ -35,13 +35,13 @@ def _get_mzm_xmls(wafer: str) -> list:
 
 
 def _csv_dir() -> str:
-    return os.path.join(RES_DIR, 'csv', 'MZM', PROJECT_NAME)
+    return os.path.join(RES_DIR, 'csv', 'MZM')
 
 def _csv_path(wafer: str) -> str:
     return os.path.join(_csv_dir(), f'{wafer}.csv')
 
 def _csv_total_path() -> str:
-    return os.path.join(_csv_dir(), f'{PROJECT_NAME}_total.csv')
+    return os.path.join(_csv_dir(), 'Total_Result.csv')
 
 
 def generate_csv(wafer: str, verbose: bool = True) -> str:

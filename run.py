@@ -35,14 +35,15 @@ def run_device_wafer(device_type: str, wafer_id: str) -> dict | None:
     print(f"\n{'='*60}")
     print(f"  디바이스: {device_type}  |  웨이퍼: {wafer_id}")
     print(f"  데이터 경로 : data/{PROJECT_NAME}/{wafer_id}/{{timestamp}}/")
-    print(f"  저장 경로   : res/{wafer_id}-{cfg['save_root']}/{{timestamp}}/")
+    print(f"  저장 경로   : res/png/{device_type}/{wafer_id}/{{timestamp}}/")
     print(f"{'='*60}")
 
     try:
         if device_type == "GPDO":
+            png_dir  = os.path.join(RES_DIR, "png", "GPDO", wafer_id)
             analyzer = runner_cls(data_dir=DATA_DIR, wafer_id=wafer_id)
-            results  = analyzer.run(save_dir=save_dir)
-            csv_dir  = os.path.join(RES_DIR, "csv")
+            results  = analyzer.run(save_dir=png_dir)
+            csv_dir  = os.path.join(RES_DIR, "csv", "GPDO")
             save_results(results, wafer_id=wafer_id, base_dir=csv_dir)
         else:
             analyzer = runner_cls()

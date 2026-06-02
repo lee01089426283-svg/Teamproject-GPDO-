@@ -49,7 +49,7 @@ def _get_mzm_xmls(wafer: str) -> list:
     return results
 
 def _png_dir(wafer: str, date: str) -> str:
-    return os.path.join(RES_DIR, 'png', 'MZM', PROJECT_NAME, wafer, date)
+    return os.path.join(RES_DIR, 'png', 'MZM', wafer, date)
 
 def _png_path(wafer: str, date: str, xml_basename: str) -> str:
     stem = os.path.splitext(xml_basename)[0]
