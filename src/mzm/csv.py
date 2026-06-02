@@ -38,7 +38,7 @@ def _csv_dir() -> str:
     return os.path.join(RES_DIR, 'csv', 'MZM')
 
 def _csv_path(wafer: str) -> str:
-    return os.path.join(_csv_dir(), f'{wafer}.csv')
+    return os.path.join(_csv_dir(), f'{wafer}_Result.csv')
 
 def _csv_total_path() -> str:
     return os.path.join(_csv_dir(), 'Total_Result.csv')
