@@ -52,7 +52,7 @@ class Plotter:
             out_path = os.path.join(save_dir, png_name)
             fig.savefig(out_path, dpi=120, bbox_inches='tight')
             if verbose:
-                print(f'  PNG 저장: {out_path}')
+                print(f'       💾 저장: {out_path}')
 
         plt.close(fig)
         return out_path
