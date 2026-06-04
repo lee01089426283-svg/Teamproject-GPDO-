@@ -227,10 +227,26 @@ class Plotter:
 
         device_type = MZMParser.detect_device_type(root)
 
+        # ALIGN modulator DCBias=0.0 sweep을 reference로 사용
+        ref_wl = ref_dB = None
+        for mod in root.findall('.//{*}Modulator'):
+            if 'ALIGN' in mod.attrib.get('Name', '').upper():
+                for sweep in mod.findall('.//{*}WavelengthSweep'):
+                    if sweep.attrib.get('DCBias', '').strip() == '0.0':
+                        rl = sweep.find('L')  or sweep.find('.//{*}L')
+                        ri = sweep.find('IL') or sweep.find('.//{*}IL')
+                        if rl is not None and ri is not None:
+                            ref_wl = parse_array(rl.text)
+                            ref_dB = parse_array(ri.text)
+                        break
+            if ref_wl is not None:
+                break
+
         try:
             wl  = parse_array(l_node.text)
             res = fit_mzi(wl, parse_array(il_node.text),
-                          bias_voltage=best_bias, device_type=device_type)
+                          bias_voltage=best_bias, device_type=device_type,
+                          ref_wl=ref_wl, ref_dB=ref_dB)
         except Exception as e:
             ax.set_title(f'MZI Fitting\n(오류: {e})')
             return
