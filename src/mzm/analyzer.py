@@ -9,10 +9,10 @@ from src.heatmap_plotter import HeatmapPlotter
 
 
 def _png_dir(wafer: str, date: str) -> str:
-    return os.path.join(RES_DIR, 'png', 'MZM', PROJECT_NAME, wafer, date)
+    return os.path.join(RES_DIR, 'png', 'MZM', wafer, date)
 
 def _heatmap_dir(wafer: str, date: str) -> str:
-    return os.path.join(RES_DIR, 'png', 'MZM', PROJECT_NAME, wafer, date, 'heatmap')
+    return os.path.join(RES_DIR, 'png', 'MZM', wafer, date, 'heatmap')
 
 def _csv_dir() -> str:
     return os.path.join(RES_DIR, 'csv', 'MZM', PROJECT_NAME)
@@ -32,7 +32,7 @@ class MZMAnalyzer:
         pngs = []
         ts_data: dict[str, list] = defaultdict(list)
 
-        print(f'  총 {len(xml_files)}개 XML 처리 시작')
+        print(f'  📂 {wafer_id}  →  {len(xml_files)}개 파일')
         for date, xml_file in xml_files:
             out = Plotter.plot(
                 xml_file,
@@ -76,7 +76,7 @@ class MZMAnalyzer:
             if not rows:
                 continue
             save_dir = _heatmap_dir(wafer, date)
-            print(f'\n  [{wafer}/{date}] 히트맵 생성 — {len(rows)}개 다이')
+            print(f'  📊 [{wafer}/{date}] 히트맵 생성 중...')
             HeatmapPlotter.plot_mzm_all_from_rows(
                 rows=rows,
                 wafer_id=wafer,

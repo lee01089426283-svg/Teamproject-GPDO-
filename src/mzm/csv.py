@@ -60,7 +60,7 @@ def generate_csv(wafer: str, verbose: bool = True) -> str:
     for date, path in xml_files:
         fname = os.path.basename(path)
         if verbose:
-            print(f'  파싱: {fname}')
+            print(f'       📄 파싱: {fname}')
         try:
             row = parse_xml(ET.parse(path).getroot(), fname)
             if row is not None:
@@ -73,7 +73,7 @@ def generate_csv(wafer: str, verbose: bool = True) -> str:
     df.to_csv(out, index=False, encoding='utf-8-sig')
 
     if verbose:
-        print(f'  → {len(df)}행 저장: {out}')
+        print(f'[mzm_csv] {wafer} CSV 저장 완료 → {out}')
     return out
 
 
@@ -93,5 +93,5 @@ def generate_total_csv(verbose: bool = True) -> str:
     df_total.to_csv(out, index=False, encoding='utf-8-sig')
 
     if verbose:
-        print(f'\n[Total] {len(df_total)}행 저장: {out}')
+        print(f'[mzm_csv] Total CSV 업데이트 완료 → {out}')
     return out
