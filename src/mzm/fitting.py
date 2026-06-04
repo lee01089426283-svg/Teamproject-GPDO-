@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 from scipy.optimize import curve_fit
 from scipy.ndimage import uniform_filter1d
@@ -27,7 +28,9 @@ def process_spectrum(ws_elem) -> tuple:
         il = parse_array(ws_elem.find('.//{*}IL').text)
         n  = min(len(wl), len(il))
         wl, il = wl[:n], il[:n]
-        coeffs = np.polyfit(wl, il, 4)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", np.exceptions.RankWarning)
+            coeffs = np.polyfit(wl, il, 4)
         il_fit = np.polyval(coeffs, wl)
         return calc_rsq(il, il_fit), float(np.max(il))
     except Exception as e:
@@ -122,7 +125,9 @@ def fit_polynomials(wavelengths: np.ndarray, transmissions: np.ndarray,
                     orders=(2, 3, 4, 5, 6)) -> dict:
     results = {}
     for order in orders:
-        coeffs = np.polyfit(wavelengths, transmissions, order)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", np.exceptions.RankWarning)
+            coeffs = np.polyfit(wavelengths, transmissions, order)
         fitted = np.polyval(coeffs, wavelengths)
         results[order] = {'coeffs': coeffs, 'fitted': fitted, 'r2': r_squared(transmissions, fitted)}
     return results
@@ -136,7 +141,9 @@ def remove_residual_baseline(wl: np.ndarray, y: np.ndarray,
     weights = np.ones_like(x_fit)
     weights[0] = 20
     weights[-1] = 5
-    coeffs   = np.polyfit(x_fit, y_fit, degree, w=weights)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", np.exceptions.RankWarning)
+        coeffs = np.polyfit(x_fit, y_fit, degree, w=weights)
     baseline = np.polyval(coeffs, wl)
     return y - baseline, baseline
 
