@@ -1,8 +1,6 @@
-# ══════════════════════════════════════════════════════
-# src/common/heatmap_plotter.py  –  웨이퍼 히트맵 시각화
-# ══════════════════════════════════════════════════════
 import os
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.colors import Normalize
@@ -11,34 +9,160 @@ from matplotlib.cm import ScalarMappable
 
 class HeatmapPlotter:
     """
-    results 리스트(각 다이의 분석 결과 dict)에서
-    특정 파라미터를 웨이퍼 레이아웃 히트맵으로 시각화.
+    웨이퍼 레이아웃 히트맵 시각화.
+
+    GPDO
+    ----
+    plot(results, param_key, ...)
+        results : GPDOAnalyzer.run() 반환 dict 리스트
+                  각 dict에 'col', 'row', param_key 키 필요
+
+    MZM  (주 진입점)
+    ----
+    plot_mzm_all_from_rows(rows, wafer_id, save_dir)
+        rows     : MZMParser.parse() 반환 dict 리스트 (timestamp 1개분)
+                   'Row', 'Column', 각 param_key 키 필요
+        → MZM_HEATMAP_PARAMS 4개를 timestamp 폴더/heatmap/ 에 저장
+
+    MZM  (보조 — CSV 경유)
+    ----
+    plot_from_csv(csv_path, param_key, ...)
+    plot_mzm_all(csv_path, ...)
     """
+
+    MZM_HEATMAP_PARAMS = [
+        ("Max transmission of Ref. spec (dB)", "Max Transmission of Ref. Spec", "dB", "RdYlGn"),
+        ("Rsq of Ref. spectrum (Nth)",          "Rsq of Ref. Spectrum",          "",   "RdYlGn"),
+        ("Rsq of IV",                           "Rsq of IV",                     "",   "RdYlGn"),
+        ("I at -1V [A]",                        "I at -1V",                      "A",  "RdYlBu"),
+    ]
+
+    # ── GPDO 진입점 ───────────────────────────────────────
 
     @staticmethod
     def plot(results: list, param_key: str, title: str,
              unit: str, cmap: str = "RdYlGn",
              wafer_id: str = "D08",
              save_dir: str = None) -> None:
-        """
-        Parameters
-        ----------
-        results   : GPDOAnalyzer.run() 이 반환하는 dict 리스트
-        param_key : 히트맵에 표시할 값의 키 (예: 'Iph', 'n_d' 등)
-        title     : 플롯 제목 (사람이 읽기 좋은 설명)
-        unit      : 단위 문자열 (없으면 빈 문자열 "")
-        cmap      : matplotlib colormap 이름
-        wafer_id  : 제목에 표시할 웨이퍼 ID
-        save_dir  : PNG 저장 폴더 (None 이면 저장 생략)
-        """
         cols = [r['col'] for r in results]
         rows = [r['row'] for r in results]
         vals = [r.get(param_key, np.nan) for r in results]
 
-        valid   = [(c, ro, v) for c, ro, v in zip(cols, rows, vals)
-                   if not np.isnan(v)]
-        missing = [(c, ro)    for c, ro, v in zip(cols, rows, vals)
-                   if np.isnan(v)]
+        HeatmapPlotter._draw_and_save(
+            cols=cols, rows=rows, vals=vals,
+            param_key=param_key, title=title, unit=unit, cmap=cmap,
+            wafer_id=wafer_id, save_dir=save_dir,
+        )
+
+    # ── MZM 주 진입점 — dict 리스트 직접 사용 ─────────────
+
+    @classmethod
+    def plot_mzm_all_from_rows(cls, rows: list,
+                                wafer_id: str = "",
+                                save_dir: str = None) -> None:
+        for param_key, title, unit, cmap in cls.MZM_HEATMAP_PARAMS:
+            try:
+                cols = [r.get('Column') for r in rows]
+                _rows = [r.get('Row') for r in rows]
+                vals = []
+                for r in rows:
+                    v = r.get(param_key)
+                    try:
+                        vals.append(float(v) if v is not None else np.nan)
+                    except (TypeError, ValueError):
+                        vals.append(np.nan)
+
+                safe_key = (param_key.replace(' ', '_')
+                                     .replace('/', '_')
+                                     .replace('.', '')
+                                     .replace('[', '')
+                                     .replace(']', ''))
+                cls._draw_and_save(
+                    cols=cols, rows=_rows, vals=vals,
+                    param_key=safe_key, title=title, unit=unit, cmap=cmap,
+                    wafer_id=wafer_id, save_dir=save_dir,
+                )
+            except Exception as e:
+                print(f'  [WARN] 히트맵 실패 [{param_key}]: {e}')
+
+    # ── MZM 보조 진입점 — CSV 파일 경유 ──────────────────
+
+    @classmethod
+    def plot_from_csv(cls, csv_path: str,
+                      param_key: str, title: str,
+                      unit: str, cmap: str = "RdYlGn",
+                      wafer_id: str = "",
+                      group_key: str = "device_type",
+                      save_dir: str = None) -> None:
+        try:
+            df = pd.read_csv(csv_path, encoding='utf-8-sig')
+        except Exception as e:
+            print(f'  [ERROR] CSV 로드 실패: {e}')
+            return
+
+        if 'device_type' not in df.columns and 'Script ID' in df.columns:
+            df['device_type'] = df['Script ID'].str.extract(r'DCM_(LMZC|LMZO)')
+
+        if not wafer_id and 'Wafer' in df.columns:
+            wafer_id = str(df['Wafer'].iloc[0])
+
+        if param_key not in df.columns:
+            print(f'  [WARN] {param_key} 컬럼 없음: {csv_path}')
+            return
+
+        safe_key = (param_key.replace(' ', '_').replace('/', '_')
+                             .replace('.', '').replace('[', '').replace(']', ''))
+
+        if group_key and group_key in df.columns:
+            for group_val, group_df in df.groupby(group_key):
+                cols = group_df['Column'].tolist()
+                rows = group_df['Row'].tolist()
+                vals = pd.to_numeric(group_df[param_key], errors='coerce').tolist()
+                cls._draw_and_save(
+                    cols=cols, rows=rows, vals=vals,
+                    param_key=f"{safe_key}_{group_val}",
+                    title=title, unit=unit, cmap=cmap,
+                    wafer_id=f"{wafer_id} [{group_val}]",
+                    save_dir=save_dir,
+                )
+        else:
+            cols = df['Column'].tolist()
+            rows = df['Row'].tolist()
+            vals = pd.to_numeric(df[param_key], errors='coerce').tolist()
+            cls._draw_and_save(
+                cols=cols, rows=rows, vals=vals,
+                param_key=safe_key, title=title, unit=unit, cmap=cmap,
+                wafer_id=wafer_id, save_dir=save_dir,
+            )
+
+    @classmethod
+    def plot_mzm_all(cls, csv_path: str,
+                     wafer_id: str = "",
+                     save_dir: str = None) -> None:
+        for param_key, title, unit, cmap in cls.MZM_HEATMAP_PARAMS:
+            try:
+                cls.plot_from_csv(
+                    csv_path=csv_path, param_key=param_key,
+                    title=title, unit=unit, cmap=cmap,
+                    wafer_id=wafer_id, group_key='device_type',
+                    save_dir=save_dir,
+                )
+            except Exception as e:
+                print(f'  [WARN] 히트맵 실패 [{param_key}]: {e}')
+
+    # ── 공통 드로잉 엔진 ──────────────────────────────────
+
+    @staticmethod
+    def _draw_and_save(cols: list, rows: list, vals: list,
+                       param_key: str, title: str, unit: str,
+                       cmap: str, wafer_id: str,
+                       save_dir: str = None) -> None:
+        valid   = [(int(c), int(r), float(v))
+                   for c, r, v in zip(cols, rows, vals)
+                   if v is not None and not np.isnan(float(v))]
+        missing = [(int(c), int(r))
+                   for c, r, v in zip(cols, rows, vals)
+                   if v is None or np.isnan(float(v))]
 
         if not valid:
             print(f"  ⚠ {param_key}: 유효 데이터 없음")
@@ -51,7 +175,6 @@ class HeatmapPlotter:
 
         fig, ax = plt.subplots(figsize=(7, 6))
 
-        # ── 유효 다이 ─────────────────────────────────
         for c, r, v in zip(cs, rs, vs):
             rect = mpatches.FancyBboxPatch(
                 (c - 0.45, r - 0.45), 0.9, 0.9,
@@ -65,7 +188,6 @@ class HeatmapPlotter:
                     ha="center", va="center",
                     fontsize=8, fontweight="bold", color=txt_color)
 
-        # ── 누락 다이 ─────────────────────────────────
         for c, r in missing:
             rect = mpatches.FancyBboxPatch(
                 (c - 0.45, r - 0.45), 0.9, 0.9,
@@ -78,7 +200,6 @@ class HeatmapPlotter:
                     ha="center", va="center",
                     fontsize=7, color="gray")
 
-        # ── 축 범위 ───────────────────────────────────
         all_c = list(cs) + [c for c, _ in missing]
         all_r = list(rs) + [r for _, r in missing]
         ax.set_xlim(min(all_c) - 0.7, max(all_c) + 0.7)
@@ -91,12 +212,9 @@ class HeatmapPlotter:
         ax.set_title(f"Wafer {wafer_id} Heatmap – {title}{unit_str}",
                      fontweight="bold", fontsize=11)
         ax.grid(True, alpha=0.15, linestyle=":")
-        plt.colorbar(sm, ax=ax,
-                     label=f"{title}{unit_str}",
-                     shrink=0.85)
+        plt.colorbar(sm, ax=ax, label=f"{title}{unit_str}", shrink=0.85)
         plt.tight_layout()
 
-        # ── 저장 ──────────────────────────────────────
         if save_dir:
             os.makedirs(save_dir, exist_ok=True)
             fpath = os.path.join(save_dir, f"heatmap_{param_key}.png")
