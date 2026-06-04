@@ -344,11 +344,15 @@ def _save_plots(xml_file: str, wafer: str, date: str,
     _plot_iv_fitting(           axes[1, 2], root)
 
     plt.tight_layout()
-    plt.savefig(out_png, dpi=120, bbox_inches='tight')
-    plt.close(fig)
-
-    if verbose:
-        print(f'  PNG 저장: {out_png}')
+    try:
+        os.makedirs(os.path.dirname(out_png), exist_ok=True)
+        plt.savefig(out_png, dpi=120, bbox_inches='tight')
+        if verbose:
+            print(f'  PNG 저장: {out_png}')
+    except Exception as e:
+        print(f'  [ERROR] PNG 저장 실패 {os.path.basename(out_png)}: {e}')
+    finally:
+        plt.close(fig)
     return out_png
 
 
