@@ -48,12 +48,12 @@ def run_device_wafer(device_type: str, wafer_id: str) -> dict | None:
     print(f"\n{'='*60}")
     print(f"  디바이스: {device_type}  |  웨이퍼: {wafer_id}")
     print(f"  데이터 경로 : data/{PROJECT_NAME}/{wafer_id}/{{timestamp}}/")
-    print(f"  저장 경로   : res/png/{png_sub}/{wafer_id}/{{timestamp}}/")
+    print(f"  저장 경로   : res/png/{png_sub}/{PROJECT_NAME}/{wafer_id}/{{timestamp}}/")
     print(f"{'='*60}")
 
     try:
         if device_type == "GPDO":
-            png_dir  = os.path.join(RES_DIR, "png", "GPDO", wafer_id)
+            png_dir  = os.path.join(RES_DIR, "png", "GPDO", PROJECT_NAME, wafer_id)
             analyzer = runner_cls(data_dir=DATA_DIR, wafer_id=wafer_id)
             results  = analyzer.run(save_dir=png_dir)
             if not results:
@@ -110,7 +110,7 @@ def main(targets: list[str] | None = None) -> dict[str, dict[str, list]]:
         for wafer_id in plan[dtype]:
             png_sub = PNG_SUBDIR.get(dtype, dtype)
             if wafer_id in all_results.get(dtype, {}):
-                print(f"  ✅ {dtype:6s} / {wafer_id}  →  res/png/{png_sub}/{wafer_id}/")
+                print(f"  ✅ {dtype:6s} / {wafer_id}  →  res/png/{png_sub}/{PROJECT_NAME}/{wafer_id}/")
             else:
                 print(f"  ❌ {dtype:6s} / {wafer_id}  →  처리 실패 또는 건너뜀")
     print(f"{'='*60}\n")
