@@ -22,6 +22,36 @@ def _csv_path(wafer: str) -> str:
 
 
 class MZMAnalyzer:
+    def run_wafer(self, wafer_id: str) -> tuple[list, list]:
+        csv_rows = generate_csv(wafer_id, verbose=True)
+
+        xml_files = MZMParser.get_mzm_xmls(wafer_id)
+        if not xml_files:
+            return csv_rows, []
+
+        pngs = []
+        ts_data: dict[str, list] = defaultdict(list)
+
+        print(f'  총 {len(xml_files)}개 XML 처리 시작')
+        for date, xml_file in xml_files:
+            out = Plotter.plot(
+                xml_file,
+                save_dir=_png_dir(wafer_id, date),
+                verbose=True,
+            )
+            if out:
+                pngs.append(out)
+
+            try:
+                parsed = MZMParser.parse(xml_file)
+                if parsed is not None:
+                    ts_data[date].append(parsed)
+            except Exception as e:
+                print(f'  [WARN] 히트맵 파싱 실패 {os.path.basename(xml_file)}: {e}')
+
+        self._plot_heatmaps_by_timestamp(ts_data, wafer_id)
+        return csv_rows, pngs
+
     def run(self, verbose: bool = True) -> tuple[dict, dict]:
         csv_results = {}
         png_results = {}
@@ -31,37 +61,9 @@ class MZMAnalyzer:
             print(f'  Wafer: {wafer}')
             print(f'{"─"*50}')
 
-            csv_results[wafer] = generate_csv(wafer, verbose=verbose)
-
-            xml_files = MZMParser.get_mzm_xmls(wafer)
-            if not xml_files:
-                print(f'  [WARN] {wafer}: MZM XML 없음 → PNG/히트맵 생성 건너뜀')
-                png_results[wafer] = []
-                continue
-
-            print(f'\n  [{wafer}] PNG 생성 시작 — {len(xml_files)}개 파일')
-            pngs = []
-            ts_data: dict[str, list] = defaultdict(list)
-
-            for date, xml_file in xml_files:
-                out = Plotter.plot(
-                    xml_file,
-                    save_dir=_png_dir(wafer, date),
-                    verbose=verbose,
-                )
-                if out:
-                    pngs.append(out)
-
-                try:
-                    parsed = MZMParser.parse(xml_file)
-                    if parsed is not None:
-                        ts_data[date].append(parsed)
-                except Exception as e:
-                    print(f'  [WARN] 히트맵 파싱 실패 {os.path.basename(xml_file)}: {e}')
-
+            csv_rows, pngs = self.run_wafer(wafer)
+            csv_results[wafer] = csv_rows
             png_results[wafer] = pngs
-
-            self._plot_heatmaps_by_timestamp(ts_data, wafer)
 
         print(f'\n{"─"*50}')
         generate_total_csv(verbose=verbose)

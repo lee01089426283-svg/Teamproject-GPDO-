@@ -17,11 +17,18 @@ from config import DATA_DIR, RES_DIR, DEVICE_CONFIG, WAFER_IDS, PROJECT_NAME
 from src.gpdo import GPDOAnalyzer
 from src.mzm import MZMAnalyzer
 from src.gpdo.csv import save_results
+from src.mzm.csv import generate_total_csv as mzm_save_total
 
 RUNNER_REGISTRY: dict[str, type] = {
     "GPDO": GPDOAnalyzer,
     "LMZC": MZMAnalyzer,
     "LMZO": MZMAnalyzer,
+}
+
+PNG_SUBDIR = {
+    "GPDO": "GPDO",
+    "LMZC": "MZM",
+    "LMZO": "MZM",
 }
 
 
@@ -36,12 +43,12 @@ def run_device_wafer(device_type: str, wafer_id: str) -> dict | None:
         print(f"⚠  '{device_type}' 에 대응하는 분석기가 아직 구현되지 않았습니다.")
         return None
 
-    save_dir = os.path.join(RES_DIR, f"{wafer_id}-{cfg['save_root']}")
+    png_sub = PNG_SUBDIR[device_type]
 
     print(f"\n{'='*60}")
     print(f"  디바이스: {device_type}  |  웨이퍼: {wafer_id}")
     print(f"  데이터 경로 : data/{PROJECT_NAME}/{wafer_id}/{{timestamp}}/")
-    print(f"  저장 경로   : res/png/{device_type}/{wafer_id}/{{timestamp}}/")
+    print(f"  저장 경로   : res/png/{png_sub}/{wafer_id}/{{timestamp}}/")
     print(f"{'='*60}")
 
     try:
@@ -51,10 +58,15 @@ def run_device_wafer(device_type: str, wafer_id: str) -> dict | None:
             results  = analyzer.run(save_dir=png_dir)
             csv_dir  = os.path.join(RES_DIR, "csv", "GPDO")
             save_results(results, wafer_id=wafer_id, base_dir=csv_dir)
-        else:
+            return results
+        else:  # LMZC / LMZO
             analyzer = runner_cls()
-            results, _ = analyzer.run()
-        return results
+            csv_rows, pngs = analyzer.run_wafer(wafer_id)
+            if not pngs:
+                print(f"  ⚠ MZM XML 없음: {wafer_id}")
+            else:
+                print(f"  총 {len(pngs)}개 PNG 저장 완료")
+            return {"csv": csv_rows, "png": pngs} if csv_rows else None
     except FileNotFoundError as e:
         print(f"\n❌ 파일을 찾을 수 없습니다:\n   {e}")
         return None
@@ -81,26 +93,22 @@ def main(targets: list[str] | None = None) -> dict[str, dict[str, list]]:
 
     for dtype in targets:
         all_results[dtype] = {}
-        if dtype in ("LMZC", "LMZO"):
-            analyzer = MZMAnalyzer()
-            csv_res, png_res = analyzer.run()
-            all_results[dtype] = csv_res
-        else:
-            for wafer_id in plan[dtype]:
-                res = run_device_wafer(dtype, wafer_id)
-                if res is not None:
-                    all_results[dtype][wafer_id] = res
+        for wafer_id in plan[dtype]:
+            res = run_device_wafer(dtype, wafer_id)
+            if res is not None:
+                all_results[dtype][wafer_id] = res
+
+    if any(d in targets for d in ("LMZC", "LMZO")):
+        mzm_save_total(verbose=True)
 
     print(f"\n{'='*60}")
     print("  📋 실행 요약")
     print(f"{'='*60}")
     for dtype in targets:
-        cfg = DEVICE_CONFIG.get(dtype, {})
         for wafer_id in plan[dtype]:
-            save_root   = cfg.get('save_root', dtype)
-            save_subdir = f"{wafer_id}-{save_root}"
+            png_sub = PNG_SUBDIR.get(dtype, dtype)
             if wafer_id in all_results.get(dtype, {}):
-                print(f"  ✅ {dtype:6s} / {wafer_id}  →  res/{save_subdir}/")
+                print(f"  ✅ {dtype:6s} / {wafer_id}  →  res/png/{png_sub}/{wafer_id}/")
             else:
                 print(f"  ❌ {dtype:6s} / {wafer_id}  →  처리 실패 또는 건너뜀")
     print(f"{'='*60}\n")
