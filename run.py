@@ -56,17 +56,19 @@ def run_device_wafer(device_type: str, wafer_id: str) -> dict | None:
             png_dir  = os.path.join(RES_DIR, "png", "GPDO", wafer_id)
             analyzer = runner_cls(data_dir=DATA_DIR, wafer_id=wafer_id)
             results  = analyzer.run(save_dir=png_dir)
+            if not results:
+                return None
             csv_dir  = os.path.join(RES_DIR, "csv", "GPDO")
             save_results(results, wafer_id=wafer_id, base_dir=csv_dir)
             return results
         else:  # LMZC / LMZO
             analyzer = runner_cls()
-            csv_rows, pngs = analyzer.run_wafer(wafer_id)
-            if not pngs:
-                print(f"  ⚠ MZM XML 없음: {wafer_id}")
-            else:
-                print(f"  총 {len(pngs)}개 PNG 저장 완료")
-            return {"csv": csv_rows, "png": pngs} if csv_rows else None
+            csv_path, pngs = analyzer.run_wafer(wafer_id)
+            if not csv_path and not pngs:
+                print(f"  ⚠ {device_type} 데이터 없음: {wafer_id}")
+                return None
+            print(f"  총 {len(pngs)}개 PNG 저장 완료")
+            return {"csv": csv_path, "png": pngs}
     except FileNotFoundError as e:
         print(f"\n❌ 파일을 찾을 수 없습니다:\n   {e}")
         return None

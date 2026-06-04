@@ -41,6 +41,9 @@ def process_iv(iv_elem) -> tuple:
     try:
         v = parse_array(iv_elem.find('.//{*}Voltage').text)
         i = parse_array(iv_elem.find('.//{*}Current').text)
+        idx = np.argsort(v)
+        v, i = v[idx], i[idx]
+
         mask_rev = v < 0
         v_rev, i_rev = v[mask_rev], i[mask_rev]
         if len(v_rev) >= 4:
@@ -48,12 +51,27 @@ def process_iv(iv_elem) -> tuple:
             rsq_iv = calc_rsq(i_rev, np.polyval(coeffs, v_rev))
         else:
             rsq_iv = None
+
         i_neg1 = float(i[np.argmin(np.abs(v + 1))])
         i_pos1 = float(abs(i[np.argmin(np.abs(v - 1))]))
-        return rsq_iv, i_neg1, i_pos1
+
+        mask_fwd = v > 0.3
+        v_fwd, i_fwd = v[mask_fwd], np.abs(i[mask_fwd])
+        n_fit = None
+        if len(v_fwd) >= 3:
+            try:
+                popt, _ = curve_fit(diode_model, v_fwd, i_fwd,
+                                    p0=[1e-14, 1.5],
+                                    bounds=([1e-20, 0.5], [1e-4, 5.0]),
+                                    maxfev=50000)
+                n_fit = float(popt[1])
+            except Exception:
+                pass
+
+        return rsq_iv, i_neg1, i_pos1, n_fit
     except Exception as e:
         print(f"  [IV error] {e}")
-        return None, None, None
+        return None, None, None, None
 
 def parse_xml(root, filename: str = "") -> dict | None:
     import os
@@ -97,10 +115,12 @@ def parse_xml(root, filename: str = "") -> dict | None:
     data['Max transmission of Ref. spec (dB)'] = max_trans
 
     iv_elem = root.find('.//{*}IVMeasurement')
-    rsq_iv, i_neg1, i_pos1 = process_iv(iv_elem) if iv_elem is not None else (None, None, None)
-    data['Rsq of IV']    = rsq_iv
-    data['I at -1V [A]'] = i_neg1
-    data['I at 1V [A]']  = i_pos1
+    rsq_iv, i_neg1, i_pos1, n_fit = (process_iv(iv_elem) if iv_elem is not None
+                                      else (None, None, None, None))
+    data['Rsq of IV']        = rsq_iv
+    data['I at -1V [A]']     = i_neg1
+    data['I at 1V [A]']      = i_pos1
+    data['Ideality Factor']  = n_fit
 
     aw = root.find('.//{*}AlignWavelength')
     if aw is not None and aw.text:

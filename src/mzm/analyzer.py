@@ -22,12 +22,12 @@ def _csv_path(wafer: str) -> str:
 
 
 class MZMAnalyzer:
-    def run_wafer(self, wafer_id: str) -> tuple[list, list]:
-        csv_rows = generate_csv(wafer_id, verbose=True)
+    def run_wafer(self, wafer_id: str) -> tuple[str, list]:
+        csv_path = generate_csv(wafer_id, verbose=True)
 
         xml_files = MZMParser.get_mzm_xmls(wafer_id)
         if not xml_files:
-            return csv_rows, []
+            return csv_path, []
 
         pngs = []
         ts_data: dict[str, list] = defaultdict(list)
@@ -50,7 +50,7 @@ class MZMAnalyzer:
                 print(f'  [WARN] 히트맵 파싱 실패 {os.path.basename(xml_file)}: {e}')
 
         self._plot_heatmaps_by_timestamp(ts_data, wafer_id)
-        return csv_rows, pngs
+        return csv_path, pngs
 
     def run(self, verbose: bool = True) -> tuple[dict, dict]:
         csv_results = {}
@@ -61,8 +61,8 @@ class MZMAnalyzer:
             print(f'  Wafer: {wafer}')
             print(f'{"─"*50}')
 
-            csv_rows, pngs = self.run_wafer(wafer)
-            csv_results[wafer] = csv_rows
+            csv_path, pngs = self.run_wafer(wafer)
+            csv_results[wafer] = csv_path
             png_results[wafer] = pngs
 
         print(f'\n{"─"*50}')

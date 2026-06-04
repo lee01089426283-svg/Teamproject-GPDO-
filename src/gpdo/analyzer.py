@@ -63,9 +63,8 @@ class GPDOAnalyzer:
         { timestamp: [result_dict, ...] }
         """
         if not os.path.isdir(self.wafer_dir):
-            raise FileNotFoundError(
-                f"웨이퍼 폴더가 없습니다: {self.wafer_dir}"
-            )
+            print(f"  ⚠ 웨이퍼 폴더 없음: {self.wafer_dir}")
+            return {}
 
         timestamps = sorted([
             d for d in os.listdir(self.wafer_dir)
@@ -73,9 +72,8 @@ class GPDOAnalyzer:
         ])
 
         if not timestamps:
-            raise FileNotFoundError(
-                f"타임스탬프 폴더가 없습니다: {self.wafer_dir}"
-            )
+            print(f"  ⚠ 타임스탬프 폴더 없음: {self.wafer_dir}")
+            return {}
 
         all_results: dict[str, list] = {}
 

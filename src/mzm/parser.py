@@ -107,11 +107,13 @@ class MZMParser:
         data['Max transmission of Ref. spec (dB)'] = max_trans
 
         iv_elem = root.find('.//{*}IVMeasurement')
-        rsq_iv, i_neg1, i_pos1 = (process_iv(iv_elem)
-                                   if iv_elem is not None else (None, None, None))
-        data['Rsq of IV']    = rsq_iv
-        data['I at -1V [A]'] = i_neg1
-        data['I at 1V [A]']  = i_pos1
+        rsq_iv, i_neg1, i_pos1, n_fit = (process_iv(iv_elem)
+                                          if iv_elem is not None
+                                          else (None, None, None, None))
+        data['Rsq of IV']       = rsq_iv
+        data['I at -1V [A]']    = i_neg1
+        data['I at 1V [A]']     = i_pos1
+        data['Ideality Factor'] = n_fit
 
         aw = root.find('.//{*}AlignWavelength')
         if aw is not None and aw.text:
