@@ -58,7 +58,7 @@ def run_device_wafer(device_type: str, wafer_id: str) -> dict | None:
             results  = analyzer.run(save_dir=png_dir)
             if not results:
                 return None
-            csv_dir  = os.path.join(RES_DIR, "csv", "GPDO")
+            csv_dir  = os.path.join(RES_DIR, "csv", "GPDO", PROJECT_NAME)
             save_results(results, wafer_id=wafer_id, base_dir=csv_dir)
             return results
         else:  # LMZC / LMZO

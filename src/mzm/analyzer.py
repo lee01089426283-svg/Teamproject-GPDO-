@@ -14,12 +14,6 @@ def _png_dir(wafer: str, date: str) -> str:
 def _heatmap_dir(wafer: str, date: str) -> str:
     return os.path.join(RES_DIR, 'png', 'MZM', PROJECT_NAME, wafer, date, 'heatmap')
 
-def _csv_dir() -> str:
-    return os.path.join(RES_DIR, 'csv', 'MZM', PROJECT_NAME)
-
-def _csv_path(wafer: str) -> str:
-    return os.path.join(_csv_dir(), f'{wafer}.csv')
-
 
 class MZMAnalyzer:
     def run_wafer(self, wafer_id: str) -> tuple[str, list]:
