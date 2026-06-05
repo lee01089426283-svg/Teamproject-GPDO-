@@ -16,7 +16,9 @@ COLUMNS_ORDER = [
     'Rsq of IV',
     'I at -1V [A]',
     'I at 1V [A]',
-    'Ideality Factor'
+    'Ideality Factor',
+    'Extinction Ratio (dB)',
+    'FSR (nm)',
 ]
 
 

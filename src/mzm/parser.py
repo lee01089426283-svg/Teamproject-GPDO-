@@ -6,7 +6,7 @@ import numpy as np
 from config import DATA_DIR
 from src.mzm.fitting import (
     parse_array, process_spectrum, process_iv,
-    SCRIPT_VERSION, SCRIPT_OWNER,
+    fit_mzi, SCRIPT_VERSION, SCRIPT_OWNER,
 )
 
 
@@ -124,6 +124,44 @@ class MZMParser:
                 if 'wavelength' in dp.attrib.get('Name', '').lower():
                     data['Analysis Wavelength'] = (dp.text or '').strip()
                     break
+
+        # ── MZI fitting: ER / FSR 추출 ──────────────────
+        data['Extinction Ratio (dB)'] = None
+        data['FSR (nm)']              = None
+
+        ref_ws = cls._find_ref_sweep(root)
+        ref_wl_arr = ref_dB_arr = None
+        if ref_ws is not None:
+            rl = ref_ws.find('L') or ref_ws.find('.//{*}L')
+            ri = ref_ws.find('IL') or ref_ws.find('.//{*}IL')
+            if rl is not None and ri is not None:
+                ref_wl_arr = parse_array(rl.text)
+                ref_dB_arr = parse_array(ri.text)
+
+        device_type   = cls.detect_device_type(root)
+        best_sweep    = None
+        best_dist_mzi = 1e9
+        for sweep in root.findall('.//{*}WavelengthSweep'):
+            try:
+                b = float(sweep.attrib.get('DCBias', 'nan'))
+            except ValueError:
+                continue
+            if abs(b - (-1.0)) < best_dist_mzi:
+                best_dist_mzi, best_sweep = abs(b - (-1.0)), sweep
+
+        if best_sweep is not None:
+            l_node  = best_sweep.find('L')  or best_sweep.find('.//{*}L')
+            il_node = best_sweep.find('IL') or best_sweep.find('.//{*}IL')
+            if l_node is not None and il_node is not None:
+                try:
+                    wl      = parse_array(l_node.text)
+                    mzi_res = fit_mzi(wl, parse_array(il_node.text),
+                                      device_type=device_type,
+                                      ref_wl=ref_wl_arr, ref_dB=ref_dB_arr)
+                    data['Extinction Ratio (dB)'] = round(mzi_res['ER'],  2)
+                    data['FSR (nm)']              = round(mzi_res['FSR'], 4)
+                except Exception:
+                    pass
 
         errors = []
         if rsq_iv   is not None and rsq_iv   < 0.98:   errors.append('IV_fit')

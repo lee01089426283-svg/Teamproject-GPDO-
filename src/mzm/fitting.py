@@ -2,7 +2,7 @@ import warnings
 import numpy as np
 from scipy.optimize import curve_fit
 from scipy.ndimage import uniform_filter1d
-from scipy.signal import argrelmax
+from scipy.signal import argrelmax, argrelmin
 
 SCRIPT_VERSION = "0.1"
 SCRIPT_OWNER   = "A2"
@@ -210,33 +210,46 @@ def fit_mzi(wavelength: np.ndarray, T_raw_dB: np.ndarray,
 
     T_flat_dB = 10 * np.log10(np.clip(T_norm, 1e-9, None))
 
-    # FSR 추정 (자기상관)
-    sig_ac = T_norm - T_norm.mean()
-    ac     = np.correlate(sig_ac, sig_ac, mode='full')[len(sig_ac)-1:]
-    ac_peaks = argrelmax(ac, order=max(1, int(FSR_pts * 0.3)))[0]
-    FSR_g    = ac_peaks[0] * dλ if len(ac_peaks) else prior['center']
-    FSR_g    = float(np.clip(FSR_g, prior['min'], prior['max']))
+    # FSR / lam0 추정: 딥(로컬 최솟값) 위치 기반
+    min_order = max(1, int(FSR_pts * 0.3))
+    dip_idx   = argrelmin(T_norm, order=min_order)[0]
 
-    # Fix 1 & 2: lam0 초기값 → T_norm의 첫 번째 피크 위치로 추정
-    t_peaks = argrelmax(T_norm, order=max(1, int(FSR_pts * 0.3)))[0]
-    lam0_g  = wavelength[t_peaks[0]] if len(t_peaks) > 0 else wavelength[len(wavelength)//4]
+    if len(dip_idx) >= 2:
+        # 여러 딥 간격의 중앙값 → FSR 추정 (단일 피크보다 안정적)
+        dip_spacings = np.diff(wavelength[dip_idx])
+        FSR_g = float(np.median(dip_spacings))
+        FSR_g = float(np.clip(FSR_g, prior['min'], prior['max']))
+        # lam0 = 첫 번째 딥 위치에서 FSR/2 앞 (피크 위치)
+        lam0_g = wavelength[dip_idx[0]] - FSR_g / 2
+    elif len(dip_idx) == 1:
+        FSR_g  = float(np.clip(prior['center'], prior['min'], prior['max']))
+        lam0_g = wavelength[dip_idx[0]] - FSR_g / 2
+    else:
+        # fallback: 자기상관
+        sig_ac   = T_norm - T_norm.mean()
+        ac       = np.correlate(sig_ac, sig_ac, mode='full')[len(sig_ac)-1:]
+        ac_peaks = argrelmax(ac, order=min_order)[0]
+        FSR_g    = ac_peaks[0] * dλ if len(ac_peaks) else prior['center']
+        FSR_g    = float(np.clip(FSR_g, prior['min'], prior['max']))
+        t_peaks  = argrelmax(T_norm, order=min_order)[0]
+        lam0_g   = wavelength[t_peaks[0]] if len(t_peaks) > 0 else wavelength[0]
 
-    # A 하한 1e-4 = -40 dB floor, lam0 범위를 ±FSR로 확장
-    p0 = [0.01, 0.97, FSR_g,        lam0_g]
-    lo = [1e-4, 0.50, prior['min'], wavelength[0]  - FSR_g]
-    hi = [0.35, 1.05, prior['max'], wavelength[-1] + FSR_g]
+    # A floor 제거: 실제 소광비(ER)를 정확하게 추출
+    p0 = [0.01, 0.97, FSR_g,       lam0_g]
+    lo = [1e-9, 0.30, prior['min'], wavelength[0]  - FSR_g]
+    hi = [0.50, 1.05, prior['max'], wavelength[-1] + FSR_g]
 
     try:
         popt, _ = curve_fit(mzi_model, wavelength, T_norm,
                             p0=p0, bounds=(lo, hi), maxfev=40000)
     except Exception:
-        # fallback도 bounds 유지 → 물결 발산 방지 (Fix 2)
         popt, _ = curve_fit(mzi_model, wavelength, T_norm,
                             p0=p0, bounds=(lo, hi), maxfev=80000)
 
     A, B, FSR, lam0 = popt
     T_fit_norm = mzi_model(wavelength, *popt)
-    R2 = r_squared(T_norm, T_fit_norm)
+    R2  = r_squared(T_norm, T_fit_norm)
+    ER  = float(-10 * np.log10(np.clip(A, 1e-12, None)))  # 소광비 [dB]
 
     return {
         'T_norm':     T_norm,
@@ -244,7 +257,7 @@ def fit_mzi(wavelength: np.ndarray, T_raw_dB: np.ndarray,
         'T_norm_dB':  10 * np.log10(np.clip(T_norm,     1e-9, None)),
         'T_fit_dB':   10 * np.log10(np.clip(T_fit_norm, 1e-9, None)),
         'T_flat_dB':  T_flat_dB,
-        'A': A, 'B': B, 'FSR': FSR, 'lam0': lam0, 'R2': R2,
+        'A': A, 'B': B, 'FSR': FSR, 'lam0': lam0, 'R2': R2, 'ER': ER,
     }
 
 
