@@ -79,7 +79,7 @@ class MZMParser:
         try:
             root = cls._load_root(xml_path)
         except Exception as e:
-            print(f'  [ERROR] XML 로드 실패 {fname}: {e}')
+            print(f'       ⚠ XML 로드 실패 [{fname}]: {e}')
             return None, None
         return cls._extract(root, fname), root
 

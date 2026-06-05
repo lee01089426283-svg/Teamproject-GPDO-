@@ -29,7 +29,7 @@ def process_spectrum(ws_elem) -> tuple:
         il_fit = np.polyval(coeffs, wl)
         return r_squared(il, il_fit), float(np.max(il))
     except Exception as e:
-        print(f"  [spectrum error] {e}")
+        print(f"       ⚠ spectrum 오류: {e}")
         return None, None
 
 def process_iv(iv_elem) -> tuple:
@@ -65,7 +65,7 @@ def process_iv(iv_elem) -> tuple:
 
         return rsq_iv, i_neg1, i_pos1, n_fit
     except Exception as e:
-        print(f"  [IV error] {e}")
+        print(f"       ⚠ IV 오류: {e}")
         return None, None, None, None
 
 

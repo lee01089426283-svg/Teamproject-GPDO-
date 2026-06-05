@@ -83,7 +83,7 @@ class HeatmapPlotter:
                     wafer_id=wafer_id, save_dir=save_dir,
                 )
             except Exception as e:
-                print(f'  [WARN] 히트맵 실패 [{param_key}]: {e}')
+                print(f'       ⚠ 히트맵 실패 [{param_key}]: {e}')
 
     # ── MZM 보조 진입점 — CSV 파일 경유 ──────────────────
 
@@ -148,7 +148,7 @@ class HeatmapPlotter:
                     save_dir=save_dir,
                 )
             except Exception as e:
-                print(f'  [WARN] 히트맵 실패 [{param_key}]: {e}')
+                print(f'       ⚠ 히트맵 실패 [{param_key}]: {e}')
 
     # ── 공통 드로잉 엔진 ──────────────────────────────────
 
@@ -219,5 +219,5 @@ class HeatmapPlotter:
             os.makedirs(save_dir, exist_ok=True)
             fpath = os.path.join(save_dir, f"heatmap_{param_key}.png")
             fig.savefig(fpath, dpi=150, bbox_inches="tight")
-            print(f"       💾 저장: {fpath}")
+            print(f"       저장: {fpath}")
         plt.close(fig)

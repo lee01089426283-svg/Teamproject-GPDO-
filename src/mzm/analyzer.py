@@ -23,22 +23,28 @@ class MZMAnalyzer:
         wafer_id = self.wafer_id
         xml_files = MZMParser.get_mzm_xmls(self.wafer_id)
         if not xml_files:
-            print(f'  [WARN] {self.wafer_id}: MZM XML 없음')
+            print(f'  ⚠ MZM XML 없음: {self.wafer_id}')
             return '', []
 
         pngs        = []
         parsed_rows = []
         ts_data: dict[str, list] = defaultdict(list)
 
-        print(f'  📂 {wafer_id}  →  {len(xml_files)}개 파일')
+        # timestamp별로 묶어서 표시 (GPDO와 동일한 단위)
+        dates = sorted(set(d for d, _ in xml_files))
         for date, xml_file in xml_files:
             fname = os.path.basename(xml_file)
+
+            # timestamp 첫 파일에서 파일 수 출력
+            date_files = [f for d, f in xml_files if d == date]
+            if xml_file == date_files[0]:
+                print(f'  📂 {date}  →  {len(date_files)}개 파일')
 
             # XML 1회 파싱 → parsed dict + root 동시 획득
             try:
                 parsed, root = MZMParser.parse_with_root(xml_file)
             except Exception as e:
-                print(f'  [WARN] 파싱 실패 {fname}: {e}')
+                print(f'       ⚠ 파싱 실패 [{fname}]: {e}')
                 parsed, root = None, None
 
             # CSV + 히트맵용 데이터 수집
@@ -69,7 +75,7 @@ class MZMAnalyzer:
             if not rows:
                 continue
             save_dir = _heatmap_dir(wafer, date)
-            print(f'  📊 [{wafer}/{date}] 히트맵 생성 중...')
+            print(f'  📊 {date}  →  히트맵')
             HeatmapPlotter.plot_mzm_all_from_rows(
                 rows=rows,
                 wafer_id=wafer,
