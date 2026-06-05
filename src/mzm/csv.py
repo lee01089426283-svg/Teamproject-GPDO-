@@ -1,8 +1,9 @@
 import os
+import xml.etree.ElementTree as ET
 import pandas as pd
 
-from config import PROJECT_NAME, RES_DIR, WAFER_IDS
-from src.mzm.parser import MZMParser
+from config import PROJECT_NAME, DATA_DIR, RES_DIR, WAFER_IDS
+from src.mzm.fitting import parse_xml
 
 COLUMNS_ORDER = [
     'Lot', 'Wafer', 'Mask', 'Testsite', 'Name', 'Date',
@@ -21,6 +22,19 @@ COLUMNS_ORDER = [
 ]
 
 
+def _get_mzm_xmls(wafer: str) -> list:
+    base = os.path.join(DATA_DIR, wafer)
+    if not os.path.isdir(base):
+        return []
+    results = []
+    for date in sorted(os.listdir(base)):
+        date_dir = os.path.join(base, date)
+        if not os.path.isdir(date_dir):
+            continue
+        for fname in sorted(os.listdir(date_dir)):
+            if fname.endswith('.xml') and 'DCM_LMZ' in fname:
+                results.append((date, os.path.join(date_dir, fname)))
+    return results
 
 
 def _csv_dir() -> str:
@@ -35,7 +49,7 @@ def _csv_total_path() -> str:
 
 def generate_csv(wafer: str, verbose: bool = True) -> str:
     os.makedirs(_csv_dir(), exist_ok=True)
-    xml_files = MZMParser.get_mzm_xmls(wafer)
+    xml_files = _get_mzm_xmls(wafer)
 
     if not xml_files:
         print(f'  [WARN] {wafer}: DCM_LMZ* XML 파일 없음')
@@ -45,10 +59,11 @@ def generate_csv(wafer: str, verbose: bool = True) -> str:
         print(f'\n[{wafer}] CSV 생성 — {len(xml_files)}개 파일')
 
     rows = []
-    for _date, path in xml_files:
+    for date, path in xml_files:
         fname = os.path.basename(path)
+
         try:
-            row = MZMParser.parse(path)
+            row = parse_xml(ET.parse(path).getroot(), fname)
             if row is not None:
                 rows.append(row)
         except Exception as e:
