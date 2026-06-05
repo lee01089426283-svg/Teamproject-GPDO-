@@ -16,10 +16,14 @@ def _heatmap_dir(wafer: str, date: str) -> str:
 
 
 class MZMAnalyzer:
-    def run_wafer(self, wafer_id: str) -> tuple[str, list]:
-        xml_files = MZMParser.get_mzm_xmls(wafer_id)
+    def __init__(self, wafer_id: str):
+        self.wafer_id = wafer_id
+
+    def run_wafer(self) -> tuple[str, list]:
+        wafer_id = self.wafer_id
+        xml_files = MZMParser.get_mzm_xmls(self.wafer_id)
         if not xml_files:
-            print(f'  [WARN] {wafer_id}: MZM XML 없음')
+            print(f'  [WARN] {self.wafer_id}: MZM XML 없음')
             return '', []
 
         pngs        = []
@@ -39,6 +43,7 @@ class MZMAnalyzer:
 
             # CSV + 히트맵용 데이터 수집
             if parsed is not None:
+                parsed['timestamp'] = date   # GPDO와 동일하게 폴더명 timestamp 추가
                 parsed_rows.append(parsed)
                 ts_data[date].append(parsed)
 
@@ -53,28 +58,10 @@ class MZMAnalyzer:
                     pngs.append(out)
 
         # 파싱 결과로 CSV 저장 (별도 parse 없이 재사용)
-        csv_path = save_rows_to_csv(wafer_id, parsed_rows, verbose=True)
+        csv_path = save_rows_to_csv(self.wafer_id, parsed_rows, verbose=True)
 
-        self._plot_heatmaps_by_timestamp(ts_data, wafer_id)
+        self._plot_heatmaps_by_timestamp(ts_data, self.wafer_id)
         return csv_path, pngs
-
-    def run(self, verbose: bool = True) -> tuple[dict, dict]:
-        csv_results = {}
-        png_results = {}
-
-        for wafer in WAFER_IDS:
-            print(f'\n{"─"*50}')
-            print(f'  Wafer: {wafer}')
-            print(f'{"─"*50}')
-
-            csv_path, pngs = self.run_wafer(wafer)
-            csv_results[wafer] = csv_path
-            png_results[wafer] = pngs
-
-        print(f'\n{"─"*50}')
-        generate_total_csv(verbose=verbose)
-
-        return csv_results, png_results
 
     @staticmethod
     def _plot_heatmaps_by_timestamp(ts_data: dict, wafer: str) -> None:
