@@ -46,6 +46,17 @@ def _csv_total_path() -> str:
     return os.path.join(_csv_dir(), 'Total_Result.csv')
 
 
+def save_rows_to_csv(wafer: str, rows: list, verbose: bool = True) -> str:
+    """이미 파싱된 row dict 리스트를 받아 CSV로 저장."""
+    os.makedirs(_csv_dir(), exist_ok=True)
+    df  = pd.DataFrame(rows).reindex(columns=COLUMNS_ORDER)
+    out = _csv_path(wafer)
+    df.to_csv(out, index=False, encoding='utf-8-sig')
+    if verbose:
+        print(f'[mzm_csv] {wafer} CSV 저장 완료 → {out}')
+    return out
+
+
 def generate_csv(wafer: str, verbose: bool = True) -> str:
     os.makedirs(_csv_dir(), exist_ok=True)
     xml_files = MZMParser.get_mzm_xmls(wafer)
