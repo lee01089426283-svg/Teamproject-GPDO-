@@ -59,6 +59,7 @@ class MZMAnalyzer:
                     root, fname,
                     save_dir=_png_dir(wafer_id, date),
                     verbose=True,
+                    extra_info=parsed,
                 )
                 if out:
                     pngs.append(out)
