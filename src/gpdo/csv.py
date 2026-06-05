@@ -39,21 +39,9 @@ def _extract_row(result: dict, wafer_id: str, timestamp: str) -> dict:
 
 def save_results(all_results: dict, wafer_id: str,
                  base_dir: str = "./res/csv") -> None:
-    """
-    GPDOAnalyzer.run() 이 반환하는 { timestamp: results_list } dict를 받아
-    - res/csv/{wafer_id}_Result.csv  (해당 웨이퍼 단독)
-    - res/csv/Total_Result.csv       (전체 누적)
-    로 저장합니다.
-
-    Parameters
-    ----------
-    all_results : { timestamp: [result_dict, ...] }
-    wafer_id    : 'D08' 등 웨이퍼/다이 ID
-    base_dir    : CSV 저장 루트 폴더 (기본값: ./res/csv)
-    """
+    """웨이퍼별 CSV만 저장. Total CSV는 save_total_csv()로 별도 호출."""
     os.makedirs(base_dir, exist_ok=True)
 
-    # ── 1. 전체 행 수집 ───────────────────────────────
     rows = []
     for timestamp, results in all_results.items():
         for r in results:
@@ -64,20 +52,27 @@ def save_results(all_results: dict, wafer_id: str,
         return
 
     df = pd.DataFrame(rows, columns=COLUMNS)
-
-    # ── 2. 웨이퍼별 CSV 저장 ─────────────────────────
     wafer_csv = os.path.join(base_dir, f"{wafer_id}_Result.csv")
     df.to_csv(wafer_csv, index=False, encoding="utf-8-sig")
     print(f"[gpdo_csv] {wafer_id} CSV 저장 완료 → {wafer_csv}")
 
-    # ── 3. Total CSV 누적 저장 ────────────────────────
-    total_csv = os.path.join(base_dir, "Total_Result.csv")
-    if os.path.exists(total_csv):
-        df_existing = pd.read_csv(total_csv, encoding="utf-8-sig")
-        df_existing = df_existing[df_existing["wafer_id"] != wafer_id]
-        df_total = pd.concat([df_existing, df], ignore_index=True)
-    else:
-        df_total = df
 
+def save_total_csv(base_dir: str) -> None:
+    """base_dir 내 모든 웨이퍼 CSV를 합쳐 Total_Result.csv 생성 (마지막에 한 번 호출)."""
+    wafer_csvs = sorted([
+        os.path.join(base_dir, f)
+        for f in os.listdir(base_dir)
+        if f.endswith("_Result.csv") and f != "Total_Result.csv"
+    ]) if os.path.isdir(base_dir) else []
+
+    if not wafer_csvs:
+        print("[gpdo_csv] Total CSV 생성 실패: 웨이퍼 CSV 없음")
+        return
+
+    df_total = pd.concat(
+        [pd.read_csv(p, encoding="utf-8-sig") for p in wafer_csvs],
+        ignore_index=True,
+    )
+    total_csv = os.path.join(base_dir, "Total_Result.csv")
     df_total.to_csv(total_csv, index=False, encoding="utf-8-sig")
     print(f"[gpdo_csv] Total CSV 업데이트 완료 → {total_csv}")
