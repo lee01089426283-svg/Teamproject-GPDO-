@@ -185,44 +185,54 @@ def fit_mzi(wavelength: np.ndarray, T_raw_dB: np.ndarray,
     prior = FSR_PRIOR.get(device_type.upper(), FSR_PRIOR['LMZC'])
     dλ    = wavelength[1] - wavelength[0]
 
+    FSR_pts = int(round(prior['center'] / dλ))
+
     if ref_wl is not None and ref_dB is not None:
-        # reference 보간 후 차감 → 파장 전체에 걸쳐 일관된 baseline 제거
+        # reference 보간 후 차감 → 파장 전체 일관된 baseline 제거
         ref_interp = np.interp(wavelength, ref_wl, ref_dB)
         T_flat_dB  = T_raw_dB - ref_interp
-        T_flat     = 10.0 ** (T_flat_dB / 10.0)
-        T_norm     = T_flat / np.clip(T_flat.max(), 1e-12, None)
+        # 잔류 기울기 제거 (Fix 3: 두 modulator baseline 불일치 보정)
+        T_flat_dB, _ = remove_residual_baseline(wavelength, T_flat_dB,
+                                                 degree=2, top_percent=30)
+        T_flat = 10.0 ** (T_flat_dB / 10.0)
+        T_norm = T_flat / np.clip(T_flat.max(), 1e-12, None)
     else:
         # fallback: reference 없을 때 envelope 정규화
-        T_lin   = 10.0 ** (T_raw_dB / 10.0)
-        FSR_pts = int(round(prior['center'] / dλ))
-        w1      = 3 * FSR_pts
-        env1    = uniform_filter1d(T_lin, size=w1, mode='nearest')
-        s1      = T_lin / np.clip(env1, 1e-12, None)
-        w2      = int(1.5 * FSR_pts)
-        env2    = uniform_filter1d(s1, size=w2, mode='nearest')
-        T_flat  = s1 / np.clip(env2, 1e-12, None)
+        T_lin = 10.0 ** (T_raw_dB / 10.0)
+        w1    = 3 * FSR_pts
+        env1  = uniform_filter1d(T_lin, size=w1, mode='nearest')
+        s1    = T_lin / np.clip(env1, 1e-12, None)
+        w2    = int(1.5 * FSR_pts)
+        env2  = uniform_filter1d(s1, size=w2, mode='nearest')
+        T_flat    = s1 / np.clip(env2, 1e-12, None)
         T_flat_dB = 10 * np.log10(np.clip(T_flat, 1e-9, None))
         T_norm    = T_flat / T_flat.max()
 
     T_flat_dB = 10 * np.log10(np.clip(T_norm, 1e-9, None))
 
-    FSR_pts = int(round(prior['center'] / dλ))
+    # FSR 추정 (자기상관)
     sig_ac = T_norm - T_norm.mean()
     ac     = np.correlate(sig_ac, sig_ac, mode='full')[len(sig_ac)-1:]
-    peaks  = argrelmax(ac, order=max(1, int(FSR_pts * 0.3)))[0]
-    FSR_g  = peaks[0] * dλ if len(peaks) else prior['center']
-    FSR_g  = float(np.clip(FSR_g, prior['min'], prior['max']))
+    ac_peaks = argrelmax(ac, order=max(1, int(FSR_pts * 0.3)))[0]
+    FSR_g    = ac_peaks[0] * dλ if len(ac_peaks) else prior['center']
+    FSR_g    = float(np.clip(FSR_g, prior['min'], prior['max']))
 
-    # A 하한 1e-4 = -40 dB floor (전 파장 범위에 걸쳐 일관 적용)
-    p0 = [0.01, 0.97, FSR_g,        wavelength[0]]
-    lo = [1e-4, 0.50, prior['min'], wavelength[0] - 5.0]
-    hi = [0.35, 1.05, prior['max'], wavelength[-1]]
+    # Fix 1 & 2: lam0 초기값 → T_norm의 첫 번째 피크 위치로 추정
+    t_peaks = argrelmax(T_norm, order=max(1, int(FSR_pts * 0.3)))[0]
+    lam0_g  = wavelength[t_peaks[0]] if len(t_peaks) > 0 else wavelength[len(wavelength)//4]
+
+    # A 하한 1e-4 = -40 dB floor, lam0 범위를 ±FSR로 확장
+    p0 = [0.01, 0.97, FSR_g,        lam0_g]
+    lo = [1e-4, 0.50, prior['min'], wavelength[0]  - FSR_g]
+    hi = [0.35, 1.05, prior['max'], wavelength[-1] + FSR_g]
 
     try:
         popt, _ = curve_fit(mzi_model, wavelength, T_norm,
                             p0=p0, bounds=(lo, hi), maxfev=40000)
     except Exception:
-        popt, _ = curve_fit(mzi_model, wavelength, T_norm, p0=p0, maxfev=80000)
+        # fallback도 bounds 유지 → 물결 발산 방지 (Fix 2)
+        popt, _ = curve_fit(mzi_model, wavelength, T_norm,
+                            p0=p0, bounds=(lo, hi), maxfev=80000)
 
     A, B, FSR, lam0 = popt
     T_fit_norm = mzi_model(wavelength, *popt)
