@@ -259,7 +259,8 @@ class Plotter:
         ax.set_ylabel('Transmission (dB)')
         ax.set_title(f'MZI Fitting ({best_bias:.1f} V) [{device_type}]')
         ax.set_xlim(wl.min(), wl.max())
-        ax.set_ylim(-40, None)
+        y_min = min(res['T_norm_dB'].min(), res['T_fit_dB'].min())
+        ax.set_ylim(max(y_min - 3, -50), 2)
         ax.legend(fontsize=7)
         ax.grid(True, linestyle='--', alpha=0.3)
 
