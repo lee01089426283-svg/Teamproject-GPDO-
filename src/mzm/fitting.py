@@ -159,8 +159,8 @@ def remove_residual_baseline(wl: np.ndarray, y: np.ndarray,
     mask = y >= threshold
     x_fit, y_fit = wl[mask], y[mask]
     weights = np.ones_like(x_fit)
-    weights[0] = 20
-    weights[-1] = 5
+    weights[0] = 3
+    weights[-1] = 2
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="Polyfit may be poorly conditioned")
         coeffs = np.polyfit(x_fit, y_fit, degree, w=weights)
@@ -193,7 +193,7 @@ def fit_mzi(wavelength: np.ndarray, T_raw_dB: np.ndarray,
         T_flat_dB  = T_raw_dB - ref_interp
         # 잔류 선형 기울기 제거 (degree=1: 단순 tilt만 보정, 과적합 방지)
         T_flat_dB, _ = remove_residual_baseline(wavelength, T_flat_dB,
-                                                 degree=1, top_percent=30)
+                                                 degree=1, top_percent=20)
         T_flat = 10.0 ** (T_flat_dB / 10.0)
         T_norm = T_flat / np.clip(T_flat.max(), 1e-12, None)
     else:
@@ -236,8 +236,8 @@ def fit_mzi(wavelength: np.ndarray, T_raw_dB: np.ndarray,
 
     # A floor 제거: 실제 소광비(ER)를 정확하게 추출
     p0 = [0.01, 0.97, FSR_g,       lam0_g]
-    lo = [1e-9, 0.30, prior['min'], wavelength[0]  - FSR_g]
-    hi = [0.50, 1.05, prior['max'], wavelength[-1] + FSR_g]
+    lo = [1e-4, 0.30, prior['min'], wavelength[0]  - FSR_g]
+    hi = [0.50, 1.00, prior['max'], wavelength[-1] + FSR_g]
 
     try:
         popt, _ = curve_fit(mzi_model, wavelength, T_norm,
