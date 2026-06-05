@@ -32,8 +32,6 @@ class HeatmapPlotter:
 
     MZM_HEATMAP_PARAMS = [
         ("Max transmission of Ref. spec (dB)", "Max Transmission of Ref. Spec", "dB", "RdYlGn"),
-        ("Rsq of Ref. spectrum (Nth)",          "Rsq of Ref. Spectrum",          "",   "RdYlGn"),
-        ("Rsq of IV",                           "Rsq of IV",                     "",   "RdYlGn"),
         ("I at -1V [A]",                        "I at -1V",                      "A",  "RdYlBu"),
         ("Extinction Ratio (dB)",               "Extinction Ratio",              "dB", "RdYlGn"),
         ("FSR (nm)",                            "FSR",                           "nm", "RdYlBu"),
