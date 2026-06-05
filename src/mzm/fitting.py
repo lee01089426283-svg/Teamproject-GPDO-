@@ -2,7 +2,7 @@ import warnings
 import numpy as np
 from scipy.optimize import curve_fit
 from scipy.ndimage import uniform_filter1d
-from scipy.signal import argrelmax, argrelmin
+from scipy.signal import argrelmax, argrelmin, argrelmin
 
 SCRIPT_VERSION = "0.1"
 SCRIPT_OWNER   = "A2"
@@ -29,7 +29,7 @@ def process_spectrum(ws_elem) -> tuple:
         n  = min(len(wl), len(il))
         wl, il = wl[:n], il[:n]
         with warnings.catch_warnings():
-            warnings.simplefilter("ignore", np.exceptions.RankWarning)
+            warnings.filterwarnings("ignore", message="Polyfit may be poorly conditioned")
             coeffs = np.polyfit(wl, il, 4)
         il_fit = np.polyval(coeffs, wl)
         return calc_rsq(il, il_fit), float(np.max(il))
@@ -146,7 +146,7 @@ def fit_polynomials(wavelengths: np.ndarray, transmissions: np.ndarray,
     results = {}
     for order in orders:
         with warnings.catch_warnings():
-            warnings.simplefilter("ignore", np.exceptions.RankWarning)
+            warnings.filterwarnings("ignore", message="Polyfit may be poorly conditioned")
             coeffs = np.polyfit(wavelengths, transmissions, order)
         fitted = np.polyval(coeffs, wavelengths)
         results[order] = {'coeffs': coeffs, 'fitted': fitted, 'r2': r_squared(transmissions, fitted)}
@@ -162,7 +162,7 @@ def remove_residual_baseline(wl: np.ndarray, y: np.ndarray,
     weights[0] = 20
     weights[-1] = 5
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", np.exceptions.RankWarning)
+        warnings.filterwarnings("ignore", message="Polyfit may be poorly conditioned")
         coeffs = np.polyfit(x_fit, y_fit, degree, w=weights)
     baseline = np.polyval(coeffs, wl)
     return y - baseline, baseline
@@ -191,9 +191,9 @@ def fit_mzi(wavelength: np.ndarray, T_raw_dB: np.ndarray,
         # reference 보간 후 차감 → 파장 전체 일관된 baseline 제거
         ref_interp = np.interp(wavelength, ref_wl, ref_dB)
         T_flat_dB  = T_raw_dB - ref_interp
-        # 잔류 기울기 제거 (Fix 3: 두 modulator baseline 불일치 보정)
+        # 잔류 선형 기울기 제거 (degree=1: 단순 tilt만 보정, 과적합 방지)
         T_flat_dB, _ = remove_residual_baseline(wavelength, T_flat_dB,
-                                                 degree=2, top_percent=30)
+                                                 degree=1, top_percent=30)
         T_flat = 10.0 ** (T_flat_dB / 10.0)
         T_norm = T_flat / np.clip(T_flat.max(), 1e-12, None)
     else:
