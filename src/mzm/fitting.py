@@ -2,7 +2,7 @@ import warnings
 import numpy as np
 from scipy.optimize import curve_fit
 from scipy.ndimage import uniform_filter1d
-from scipy.signal import argrelmax, argrelmin, argrelmin
+from scipy.signal import argrelmax, argrelmin
 
 SCRIPT_VERSION = "0.1"
 SCRIPT_OWNER   = "A2"
@@ -10,11 +10,6 @@ SCRIPT_OWNER   = "A2"
 
 def parse_array(text: str) -> np.ndarray:
     return np.array([float(x.strip()) for x in text.split(',') if x.strip()])
-
-def calc_rsq(y: np.ndarray, y_fit: np.ndarray):
-    ss_res = np.sum((y - y_fit) ** 2)
-    ss_tot = np.sum((y - np.mean(y)) ** 2)
-    return float(1 - ss_res / ss_tot) if ss_tot != 0 else None
 
 def r_squared(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     ss_res = np.sum((y_true - y_pred) ** 2)
@@ -32,7 +27,7 @@ def process_spectrum(ws_elem) -> tuple:
             warnings.filterwarnings("ignore", message="Polyfit may be poorly conditioned")
             coeffs = np.polyfit(wl, il, 4)
         il_fit = np.polyval(coeffs, wl)
-        return calc_rsq(il, il_fit), float(np.max(il))
+        return r_squared(il, il_fit), float(np.max(il))
     except Exception as e:
         print(f"  [spectrum error] {e}")
         return None, None
@@ -48,7 +43,7 @@ def process_iv(iv_elem) -> tuple:
         v_rev, i_rev = v[mask_rev], i[mask_rev]
         if len(v_rev) >= 4:
             coeffs = np.polyfit(v_rev, i_rev, 3)
-            rsq_iv = calc_rsq(i_rev, np.polyval(coeffs, v_rev))
+            rsq_iv = r_squared(i_rev, np.polyval(coeffs, v_rev))
         else:
             rsq_iv = None
 
@@ -73,72 +68,6 @@ def process_iv(iv_elem) -> tuple:
         print(f"  [IV error] {e}")
         return None, None, None, None
 
-def parse_xml(root, filename: str = "") -> dict | None:
-    import os
-    data = {}
-    tsi = root.find('.//{*}TestSiteInfo')
-    if tsi is None:
-        return None
-    data['Lot']      = tsi.attrib.get('Batch')
-    data['Wafer']    = tsi.attrib.get('Wafer')
-    data['Mask']     = tsi.attrib.get('Maskset')
-    data['Testsite'] = tsi.attrib.get('TestSite')
-    data['Row']      = tsi.attrib.get('DieRow')
-    data['Column']   = tsi.attrib.get('DieColumn')
-    dev = root.find('.//{*}DeviceInfo')
-    data['Name'] = dev.attrib.get('Name') if dev is not None else None
-    data['Date']           = root.attrib.get('CreationDate')
-    data['Script ID']      = os.path.splitext(os.path.basename(filename))[0]
-    data['Script Version'] = SCRIPT_VERSION
-    data['Script Owner']   = SCRIPT_OWNER
-    data['Operator']       = root.attrib.get('Operator')
-
-    ref_ws = None
-    for mod in root.findall('.//{*}Modulator'):
-        desc = mod.findtext('.//{*}DesignDescription') or ''
-        name = mod.attrib.get('Name', '')
-        if 'reference' in desc.lower() or 'align' in name.lower():
-            for ws in mod.findall('.//{*}WavelengthSweep'):
-                if ws.attrib.get('DCBias', '').strip() == '0.0':
-                    ref_ws = ws
-                    break
-        if ref_ws is not None:
-            break
-    if ref_ws is None:
-        for ws in root.findall('.//{*}WavelengthSweep'):
-            if ws.attrib.get('DCBias', '').strip() == '0.0':
-                ref_ws = ws
-                break
-
-    rsq_ref, max_trans = process_spectrum(ref_ws) if ref_ws is not None else (None, None)
-    data['Rsq of Ref. spectrum (Nth)']         = rsq_ref
-    data['Max transmission of Ref. spec (dB)'] = max_trans
-
-    iv_elem = root.find('.//{*}IVMeasurement')
-    rsq_iv, i_neg1, i_pos1, n_fit = (process_iv(iv_elem) if iv_elem is not None
-                                      else (None, None, None, None))
-    data['Rsq of IV']        = rsq_iv
-    data['I at -1V [A]']     = i_neg1
-    data['I at 1V [A]']      = i_pos1
-    data['Ideality Factor']  = n_fit
-
-    aw = root.find('.//{*}AlignWavelength')
-    if aw is not None and aw.text:
-        data['Analysis Wavelength'] = aw.text.strip()
-    else:
-        data['Analysis Wavelength'] = None
-        for dp in root.findall('.//{*}DesignParameter'):
-            if 'wavelength' in dp.attrib.get('Name', '').lower():
-                data['Analysis Wavelength'] = (dp.text or '').strip()
-                break
-
-    errors = []
-    if rsq_iv  is not None and rsq_iv  < 0.98:  errors.append('IV_fit')
-    if rsq_ref is not None and rsq_ref < 0.95:  errors.append('Ref_fit')
-    if max_trans is not None and max_trans < -10.0: errors.append('Low_transmission')
-    data['ErrorFlag']         = len(errors)
-    data['Error description'] = ', '.join(errors) if errors else 'No Error'
-    return data
 
 
 def fit_polynomials(wavelengths: np.ndarray, transmissions: np.ndarray,
@@ -261,7 +190,11 @@ def fit_mzi(wavelength: np.ndarray, T_raw_dB: np.ndarray,
     }
 
 
-Vt = 0.02585
+# 다이오드 열전압 상수 (GPDO와 동일 방식)
+_q  = 1.602e-19   # 전자 전하 [C]
+_k  = 1.381e-23   # 볼츠만 상수 [J/K]
+_T  = 300.0       # 상온 [K]
+Vt  = _k * _T / _q  # 열전압 ≈ 0.02585 V
 
 def diode_model(V: np.ndarray, Is: float, n: float) -> np.ndarray:
     return Is * (np.exp(V / (n * Vt)) - 1)
