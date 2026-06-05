@@ -5,7 +5,7 @@ from config import PROJECT_NAME, RES_DIR, WAFER_IDS
 from src.mzm.parser import MZMParser
 
 COLUMNS_ORDER = [
-    'Lot', 'Wafer', 'Mask', 'Testsite', 'Name', 'Date',
+    'Lot', 'Wafer', 'Mask', 'Testsite', 'Name', 'Date', 'timestamp',
     'Script ID', 'Script Version', 'Script Owner', 'Operator',
     'Row', 'Column',
     'ErrorFlag', 'Error description',
