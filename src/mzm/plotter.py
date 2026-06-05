@@ -25,14 +25,20 @@ class Plotter:
     def plot(cls, xml_path: str,
              save_dir: str = None,
              verbose: bool = True) -> str:
+        """xml_path에서 직접 로드해 PNG 생성 (하위 호환용)."""
         basename = os.path.basename(xml_path)
-
         try:
             root = MZMParser._load_root(xml_path)
         except Exception as e:
             print(f'  [ERROR] XML 로드 실패 {basename}: {e}')
             return ''
+        return cls.plot_from_root(root, basename, save_dir=save_dir, verbose=verbose)
 
+    @classmethod
+    def plot_from_root(cls, root, basename: str,
+                       save_dir: str = None,
+                       verbose: bool = True) -> str:
+        """이미 로드된 root 객체로 PNG 생성 — XML 재파싱 없음."""
         fig, axes = plt.subplots(2, 3, figsize=(18, 10))
         fig.suptitle(os.path.splitext(basename)[0], fontsize=10, y=1.01)
 
