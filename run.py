@@ -13,7 +13,7 @@ if hasattr(sys.stderr, "reconfigure"):
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config import DATA_DIR, RES_DIR, DEVICE_CONFIG, WAFER_IDS, PROJECT_NAME
+from config import DATA_DIR, RES_DIR, DEVICE_CONFIG, WAFER_IDS, PROJECT_NAME, PROJECT_NAMES, _DATA_ROOT, _get_wafer_ids
 from src.gpdo import GPDOAnalyzer
 from src.mzm import MZMAnalyzer
 from src.gpdo.csv import save_results
@@ -21,18 +21,20 @@ from src.mzm.csv import generate_total_csv as mzm_save_total
 
 RUNNER_REGISTRY: dict[str, type] = {
     "GPDO": GPDOAnalyzer,
-    "LMZC": MZMAnalyzer,
-    "LMZO": MZMAnalyzer,
+    "MZM":  MZMAnalyzer,
 }
 
 PNG_SUBDIR = {
     "GPDO": "GPDO",
-    "LMZC": "MZM",
-    "LMZO": "MZM",
+    "MZM":  "MZM",
 }
 
 
-def run_device_wafer(device_type: str, wafer_id: str) -> dict | None:
+def run_device_wafer(device_type: str, wafer_id: str,
+                     data_dir: str = None, project_name: str = None) -> dict | None:
+    data_dir     = data_dir     or DATA_DIR
+    project_name = project_name or PROJECT_NAME
+
     cfg = DEVICE_CONFIG.get(device_type)
     if cfg is None:
         print(f"⚠  '{device_type}' 는 config.py 에 정의되지 않은 디바이스 타입입니다.")
@@ -47,21 +49,21 @@ def run_device_wafer(device_type: str, wafer_id: str) -> dict | None:
 
     print(f"\n{'='*60}")
     print(f"  디바이스: {device_type}  |  웨이퍼: {wafer_id}")
-    print(f"  데이터 경로 : data/{PROJECT_NAME}/{wafer_id}/{{timestamp}}/")
-    print(f"  저장 경로   : res/png/{png_sub}/{PROJECT_NAME}/{wafer_id}/{{timestamp}}/")
+    print(f"  데이터 경로 : data/{project_name}/{wafer_id}/{{timestamp}}/")
+    print(f"  저장 경로   : res/png/{png_sub}/{project_name}/{wafer_id}/{{timestamp}}/")
     print(f"{'='*60}")
 
     try:
         if device_type == "GPDO":
-            png_dir  = os.path.join(RES_DIR, "png", "GPDO", PROJECT_NAME, wafer_id)
-            analyzer = runner_cls(data_dir=DATA_DIR, wafer_id=wafer_id)
+            png_dir  = os.path.join(RES_DIR, "png", "GPDO", project_name, wafer_id)
+            analyzer = runner_cls(data_dir=data_dir, wafer_id=wafer_id)
             results  = analyzer.run(save_dir=png_dir)
             if not results:
                 return None
             csv_dir  = os.path.join(RES_DIR, "csv", "GPDO", PROJECT_NAME)
             save_results(results, wafer_id=wafer_id, base_dir=csv_dir)
             return results
-        else:  # LMZC / LMZO
+        else:  # MZM
             analyzer = runner_cls()
             csv_path, pngs = analyzer.run_wafer(wafer_id)
             if not csv_path and not pngs:
@@ -81,26 +83,34 @@ def main(targets: list[str] | None = None) -> dict[str, dict[str, list]]:
     if targets is None:
         targets = list(DEVICE_CONFIG.keys())
 
-    plan: dict[str, list[str]] = {}
-    for dtype in targets:
-        cfg = DEVICE_CONFIG.get(dtype, {})
-        plan[dtype] = cfg.get("wafer_ids") or WAFER_IDS
-
-    total_jobs = sum(len(v) for v in plan.values())
-    print(f"\n🚀 처리 대상: {targets}")
-    print(f"   웨이퍼 목록: {WAFER_IDS}")
-    print(f"   총 {total_jobs}개 작업 예정")
-
     all_results: dict[str, dict[str, list]] = {}
 
-    for dtype in targets:
-        all_results[dtype] = {}
-        for wafer_id in plan[dtype]:
-            res = run_device_wafer(dtype, wafer_id)
-            if res is not None:
-                all_results[dtype][wafer_id] = res
+    for project_name in PROJECT_NAMES:
+        wafer_ids = _get_wafer_ids(project_name)
+        data_dir  = os.path.join(_DATA_ROOT, project_name)
 
-    if any(d in targets for d in ("LMZC", "LMZO")):
+        print(f"\n{'='*60}")
+        print(f"  프로젝트: {project_name}  |  웨이퍼: {wafer_ids}")
+        print(f"{'='*60}")
+
+        plan: dict[str, list[str]] = {}
+        for dtype in targets:
+            cfg = DEVICE_CONFIG.get(dtype, {})
+            plan[dtype] = cfg.get("wafer_ids") or wafer_ids
+
+        total_jobs = sum(len(v) for v in plan.values())
+        print(f"\n🚀 처리 대상: {targets}")
+        print(f"   총 {total_jobs}개 작업 예정")
+
+        for dtype in targets:
+            if dtype not in all_results:
+                all_results[dtype] = {}
+            for wafer_id in plan[dtype]:
+                res = run_device_wafer(dtype, wafer_id, data_dir=data_dir, project_name=project_name)
+                if res is not None:
+                    all_results[dtype][wafer_id] = res
+
+    if "MZM" in targets:
         mzm_save_total(verbose=True)
 
     print(f"\n{'='*60}")
@@ -110,7 +120,7 @@ def main(targets: list[str] | None = None) -> dict[str, dict[str, list]]:
         for wafer_id in plan[dtype]:
             png_sub = PNG_SUBDIR.get(dtype, dtype)
             if wafer_id in all_results.get(dtype, {}):
-                print(f"  ✅ {dtype:6s} / {wafer_id}  →  res/png/{png_sub}/{PROJECT_NAME}/{wafer_id}/")
+                print(f"  ✅ {dtype:6s} / {wafer_id}  →  res/png/{png_sub}/")
             else:
                 print(f"  ❌ {dtype:6s} / {wafer_id}  →  처리 실패 또는 건너뜀")
     print(f"{'='*60}\n")
