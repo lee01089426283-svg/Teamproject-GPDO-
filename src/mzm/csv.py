@@ -16,7 +16,7 @@ COLUMNS_ORDER = [
     'Rsq of IV',
     'I at -1V [A]',
     'I at 1V [A]',
-    'Ideality Factor',
+    'Ideality Factor'
 ]
 
 
@@ -59,8 +59,7 @@ def generate_csv(wafer: str, verbose: bool = True) -> str:
     rows = []
     for date, path in xml_files:
         fname = os.path.basename(path)
-        if verbose:
-            print(f'       📄 파싱: {fname}')
+
         try:
             row = parse_xml(ET.parse(path).getroot(), fname)
             if row is not None:
