@@ -37,10 +37,22 @@ class Plotter:
     @classmethod
     def plot_from_root(cls, root, basename: str,
                        save_dir: str = None,
-                       verbose: bool = True) -> str:
+                       verbose: bool = True,
+                       extra_info: dict = None) -> str:
         """이미 로드된 root 객체로 PNG 생성 — XML 재파싱 없음."""
         fig, axes = plt.subplots(2, 3, figsize=(18, 10))
-        fig.suptitle(os.path.splitext(basename)[0], fontsize=10, y=1.01)
+
+        stem = os.path.splitext(basename)[0]
+        if extra_info:
+            er  = extra_info.get('Extinction Ratio (dB)')
+            fsr = extra_info.get('FSR (nm)')
+            parts = []
+            if er  is not None: parts.append(f"ER: {er:.1f} dB")
+            if fsr is not None: parts.append(f"FSR: {fsr:.3f} nm")
+            subtitle = '  |  '.join(parts)
+            fig.suptitle(f'{stem}\n{subtitle}', fontsize=11, fontweight='bold')
+        else:
+            fig.suptitle(stem, fontsize=11, fontweight='bold')
 
         cls._panel_transmission_spectra(axes[0, 0], root)
         cls._panel_ref_fitting(         axes[0, 1], root)
@@ -49,16 +61,17 @@ class Plotter:
         cls._panel_iv_raw(              axes[1, 1], root)
         cls._panel_iv_fitting(          axes[1, 2], root)
 
-        plt.tight_layout()
+        top = 0.94 if extra_info else 0.96
+        plt.tight_layout(rect=[0, 0, 1, top])
 
         out_path = ''
         if save_dir:
             os.makedirs(save_dir, exist_ok=True)
             png_name = os.path.splitext(basename)[0] + '.png'
             out_path = os.path.join(save_dir, png_name)
-            fig.savefig(out_path, dpi=120, bbox_inches='tight')
+            fig.savefig(out_path, dpi=150, bbox_inches='tight')
             if verbose:
-                print(f'       💾 저장: {out_path}')
+                print(f'       저장: {out_path}')
 
         plt.close(fig)
         return out_path
@@ -100,9 +113,9 @@ class Plotter:
                 except Exception:
                     continue
 
-        ax.set_xlabel('Wavelength (nm)')
-        ax.set_ylabel('Transmission (dB)')
-        ax.set_title('Transmission Spectra')
+        ax.set_xlabel('Wavelength [nm]')
+        ax.set_ylabel('Transmission [dB]')
+        ax.set_title('Transmission Spectra', fontweight='bold')
         ax.legend(fontsize=6, ncol=2)
         ax.grid(True, alpha=0.3)
 
@@ -154,7 +167,7 @@ class Plotter:
                 bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.7))
         ax.set_xlabel('Wavelength [nm]')
         ax.set_ylabel('Transmission [dB]')
-        ax.set_title('Reference Spectrum & Polynomial Fitting')
+        ax.set_title('Reference Spectrum & Polynomial Fitting', fontweight='bold')
         ax.legend(fontsize=5, loc='lower center', ncol=2)
         ax.grid(True, linestyle='--', alpha=0.3)
 
@@ -202,9 +215,9 @@ class Plotter:
                 except Exception:
                     continue
 
-        ax.set_xlabel('Wavelength (nm)')
-        ax.set_ylabel('Flat Transmission (dB)')
-        ax.set_title('Flat Transmission Spectra')
+        ax.set_xlabel('Wavelength [nm]')
+        ax.set_ylabel('Flat Transmission [dB]')
+        ax.set_title('Flat Transmission Spectra', fontweight='bold')
         ax.set_ylim(-50, 5)
         ax.legend(fontsize=6, ncol=2)
         ax.grid(True, alpha=0.3)
@@ -262,8 +275,8 @@ class Plotter:
         ax.plot(wl, res['T_fit_dB'],  color='black', lw=1.5, ls='--',
                 label=f"MZI fit R²={res['R2']:.4f}")
         ax.set_xlabel('Wavelength [nm]')
-        ax.set_ylabel('Transmission (dB)')
-        ax.set_title(f'MZI Fitting ({best_bias:.1f} V) [{device_type}]')
+        ax.set_ylabel('Transmission [dB]')
+        ax.set_title(f'MZI Fitting ({best_bias:.1f} V) [{device_type}]', fontweight='bold')
         ax.set_xlim(wl.min(), wl.max())
         y_min = min(res['T_norm_dB'].min(), res['T_fit_dB'].min())
         ax.set_ylim(max(y_min - 3, -50), 2)
@@ -298,7 +311,7 @@ class Plotter:
                     markersize=3, label='IV Curve')
         ax.set_xlabel('Voltage [V]')
         ax.set_ylabel('|Current| [A]')
-        ax.set_title('IV Measurement (Log Scale)')
+        ax.set_title('IV Measurement (Log Scale)', fontweight='bold')
         ax.legend(fontsize=7)
         ax.grid(True, which='both', linestyle='--', alpha=0.3)
 
@@ -340,7 +353,7 @@ class Plotter:
                 va='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
         ax.set_xlabel('Voltage [V]')
         ax.set_ylabel('|Current| [A]')
-        ax.set_title('IV Analysis')
+        ax.set_title('IV Analysis', fontweight='bold')
         ax.legend(fontsize=7, loc='lower right')
         ax.grid(True, which='both', linestyle='--', alpha=0.4)
         ax.set_xlim(res['V_all'].min() - 0.1, res['V_all'].max() + 0.1)
