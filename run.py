@@ -64,8 +64,8 @@ def run_device_wafer(device_type: str, wafer_id: str,
             save_results(results, wafer_id=wafer_id, base_dir=csv_dir)
             return results
         else:  # MZM
-            analyzer = runner_cls()
-            csv_path, pngs = analyzer.run_wafer(wafer_id)
+            analyzer = runner_cls(wafer_id=wafer_id)
+            csv_path, pngs = analyzer.run_wafer()
             if not csv_path and not pngs:
                 print(f"  ⚠ {device_type} 데이터 없음: {wafer_id}")
                 return None
