@@ -69,13 +69,19 @@ class MZMParser:
 
     @classmethod
     def parse(cls, xml_path: str) -> dict | None:
+        data, _ = cls.parse_with_root(xml_path)
+        return data
+
+    @classmethod
+    def parse_with_root(cls, xml_path: str) -> tuple:
+        """XML을 1회만 파싱해 (data_dict, root) 를 함께 반환."""
         fname = os.path.basename(xml_path)
         try:
             root = cls._load_root(xml_path)
         except Exception as e:
             print(f'  [ERROR] XML 로드 실패 {fname}: {e}')
-            return None
-        return cls._extract(root, fname)
+            return None, None
+        return cls._extract(root, fname), root
 
     @classmethod
     def _extract(cls, root, filename: str) -> dict | None:
