@@ -28,19 +28,29 @@ class MZMAnalyzer:
 
         print(f'  📂 {wafer_id}  →  {len(xml_files)}개 파일')
         for date, xml_file in xml_files:
-            # XML 파싱 1회 → CSV + 히트맵 재사용
-            try:
-                parsed = MZMParser.parse(xml_file)
-                if parsed is not None:
-                    parsed_rows.append(parsed)
-                    ts_data[date].append(parsed)
-            except Exception as e:
-                print(f'  [WARN] 파싱 실패 {os.path.basename(xml_file)}: {e}')
+            fname = os.path.basename(xml_file)
 
-            # PNG 생성 (Plotter 내부에서 XML 재사용 불가)
-            out = Plotter.plot(xml_file, save_dir=_png_dir(wafer_id, date), verbose=True)
-            if out:
-                pngs.append(out)
+            # XML 1회 파싱 → parsed dict + root 동시 획득
+            try:
+                parsed, root = MZMParser.parse_with_root(xml_file)
+            except Exception as e:
+                print(f'  [WARN] 파싱 실패 {fname}: {e}')
+                parsed, root = None, None
+
+            # CSV + 히트맵용 데이터 수집
+            if parsed is not None:
+                parsed_rows.append(parsed)
+                ts_data[date].append(parsed)
+
+            # PNG 생성 — 이미 로드된 root 재사용 (XML 재파싱 없음)
+            if root is not None:
+                out = Plotter.plot_from_root(
+                    root, fname,
+                    save_dir=_png_dir(wafer_id, date),
+                    verbose=True,
+                )
+                if out:
+                    pngs.append(out)
 
         # 파싱 결과로 CSV 저장 (별도 parse 없이 재사용)
         csv_path = save_rows_to_csv(wafer_id, parsed_rows, verbose=True)
