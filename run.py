@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import DATA_DIR, RES_DIR, DEVICE_CONFIG, WAFER_IDS, PROJECT_NAME, PROJECT_NAMES, _DATA_ROOT, _get_wafer_ids
 from src.gpdo import GPDOAnalyzer
 from src.mzm import MZMAnalyzer
-from src.gpdo.csv import save_results
+from src.gpdo.csv import save_results, save_total_csv as gpdo_save_total
 from src.mzm.csv import generate_total_csv as mzm_save_total
 
 RUNNER_REGISTRY: dict[str, type] = {
@@ -64,12 +64,11 @@ def run_device_wafer(device_type: str, wafer_id: str,
             save_results(results, wafer_id=wafer_id, base_dir=csv_dir)
             return results
         else:  # MZM
-            analyzer = runner_cls()
-            csv_path, pngs = analyzer.run_wafer(wafer_id)
+            analyzer = runner_cls(wafer_id=wafer_id)
+            csv_path, pngs = analyzer.run_wafer()
             if not csv_path and not pngs:
                 print(f"  ⚠ {device_type} 데이터 없음: {wafer_id}")
                 return None
-            print(f"  총 {len(pngs)}개 PNG 저장 완료")
             return {"csv": csv_path, "png": pngs}
     except FileNotFoundError as e:
         print(f"\n❌ 파일을 찾을 수 없습니다:\n   {e}")
@@ -110,6 +109,10 @@ def main(targets: list[str] | None = None) -> dict[str, dict[str, list]]:
                 if res is not None:
                     all_results[dtype][wafer_id] = res
 
+    # Total CSV — 모든 웨이퍼 처리 후 한 번만
+    if "GPDO" in targets:
+        gpdo_csv_dir = os.path.join(RES_DIR, "csv", "GPDO", project_name)
+        gpdo_save_total(gpdo_csv_dir)
     if "MZM" in targets:
         mzm_save_total(verbose=True)
 
@@ -117,10 +120,11 @@ def main(targets: list[str] | None = None) -> dict[str, dict[str, list]]:
     print("  📋 실행 요약")
     print(f"{'='*60}")
     for dtype in targets:
+        png_sub = PNG_SUBDIR.get(dtype, dtype)
         for wafer_id in plan[dtype]:
-            png_sub = PNG_SUBDIR.get(dtype, dtype)
+            base_path = f"res/png/{png_sub}/{project_name}/{wafer_id}"
             if wafer_id in all_results.get(dtype, {}):
-                print(f"  ✅ {dtype:6s} / {wafer_id}  →  res/png/{png_sub}/")
+                print(f"  ✅ {dtype:6s} / {wafer_id}  →  {base_path}/{{timestamp}}/")
             else:
                 print(f"  ❌ {dtype:6s} / {wafer_id}  →  처리 실패 또는 건너뜀")
     print(f"{'='*60}\n")

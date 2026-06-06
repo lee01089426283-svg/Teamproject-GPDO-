@@ -2,7 +2,7 @@ import warnings
 import numpy as np
 from scipy.optimize import curve_fit
 from scipy.ndimage import uniform_filter1d
-from scipy.signal import argrelmax
+from scipy.signal import argrelmax, argrelmin
 
 SCRIPT_VERSION = "0.1"
 SCRIPT_OWNER   = "A2"
@@ -10,11 +10,6 @@ SCRIPT_OWNER   = "A2"
 
 def parse_array(text: str) -> np.ndarray:
     return np.array([float(x.strip()) for x in text.split(',') if x.strip()])
-
-def calc_rsq(y: np.ndarray, y_fit: np.ndarray):
-    ss_res = np.sum((y - y_fit) ** 2)
-    ss_tot = np.sum((y - np.mean(y)) ** 2)
-    return float(1 - ss_res / ss_tot) if ss_tot != 0 else None
 
 def r_squared(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     ss_res = np.sum((y_true - y_pred) ** 2)
@@ -29,12 +24,12 @@ def process_spectrum(ws_elem) -> tuple:
         n  = min(len(wl), len(il))
         wl, il = wl[:n], il[:n]
         with warnings.catch_warnings():
-            warnings.simplefilter("ignore", np.exceptions.RankWarning)
+            warnings.filterwarnings("ignore", message="Polyfit may be poorly conditioned")
             coeffs = np.polyfit(wl, il, 4)
         il_fit = np.polyval(coeffs, wl)
-        return calc_rsq(il, il_fit), float(np.max(il))
+        return r_squared(il, il_fit), float(np.max(il))
     except Exception as e:
-        print(f"  [spectrum error] {e}")
+        print(f"       ⚠ spectrum 오류: {e}")
         return None, None
 
 def process_iv(iv_elem) -> tuple:
@@ -48,7 +43,7 @@ def process_iv(iv_elem) -> tuple:
         v_rev, i_rev = v[mask_rev], i[mask_rev]
         if len(v_rev) >= 4:
             coeffs = np.polyfit(v_rev, i_rev, 3)
-            rsq_iv = calc_rsq(i_rev, np.polyval(coeffs, v_rev))
+            rsq_iv = r_squared(i_rev, np.polyval(coeffs, v_rev))
         else:
             rsq_iv = None
 
@@ -70,75 +65,9 @@ def process_iv(iv_elem) -> tuple:
 
         return rsq_iv, i_neg1, i_pos1, n_fit
     except Exception as e:
-        print(f"  [IV error] {e}")
+        print(f"       ⚠ IV 오류: {e}")
         return None, None, None, None
 
-def parse_xml(root, filename: str = "") -> dict | None:
-    import os
-    data = {}
-    tsi = root.find('.//{*}TestSiteInfo')
-    if tsi is None:
-        return None
-    data['Lot']      = tsi.attrib.get('Batch')
-    data['Wafer']    = tsi.attrib.get('Wafer')
-    data['Mask']     = tsi.attrib.get('Maskset')
-    data['Testsite'] = tsi.attrib.get('TestSite')
-    data['Row']      = tsi.attrib.get('DieRow')
-    data['Column']   = tsi.attrib.get('DieColumn')
-    dev = root.find('.//{*}DeviceInfo')
-    data['Name'] = dev.attrib.get('Name') if dev is not None else None
-    data['Date']           = root.attrib.get('CreationDate')
-    data['Script ID']      = os.path.splitext(os.path.basename(filename))[0]
-    data['Script Version'] = SCRIPT_VERSION
-    data['Script Owner']   = SCRIPT_OWNER
-    data['Operator']       = root.attrib.get('Operator')
-
-    ref_ws = None
-    for mod in root.findall('.//{*}Modulator'):
-        desc = mod.findtext('.//{*}DesignDescription') or ''
-        name = mod.attrib.get('Name', '')
-        if 'reference' in desc.lower() or 'align' in name.lower():
-            for ws in mod.findall('.//{*}WavelengthSweep'):
-                if ws.attrib.get('DCBias', '').strip() == '0.0':
-                    ref_ws = ws
-                    break
-        if ref_ws is not None:
-            break
-    if ref_ws is None:
-        for ws in root.findall('.//{*}WavelengthSweep'):
-            if ws.attrib.get('DCBias', '').strip() == '0.0':
-                ref_ws = ws
-                break
-
-    rsq_ref, max_trans = process_spectrum(ref_ws) if ref_ws is not None else (None, None)
-    data['Rsq of Ref. spectrum (Nth)']         = rsq_ref
-    data['Max transmission of Ref. spec (dB)'] = max_trans
-
-    iv_elem = root.find('.//{*}IVMeasurement')
-    rsq_iv, i_neg1, i_pos1, n_fit = (process_iv(iv_elem) if iv_elem is not None
-                                      else (None, None, None, None))
-    data['Rsq of IV']        = rsq_iv
-    data['I at -1V [A]']     = i_neg1
-    data['I at 1V [A]']      = i_pos1
-    data['Ideality Factor']  = n_fit
-
-    aw = root.find('.//{*}AlignWavelength')
-    if aw is not None and aw.text:
-        data['Analysis Wavelength'] = aw.text.strip()
-    else:
-        data['Analysis Wavelength'] = None
-        for dp in root.findall('.//{*}DesignParameter'):
-            if 'wavelength' in dp.attrib.get('Name', '').lower():
-                data['Analysis Wavelength'] = (dp.text or '').strip()
-                break
-
-    errors = []
-    if rsq_iv  is not None and rsq_iv  < 0.98:  errors.append('IV_fit')
-    if rsq_ref is not None and rsq_ref < 0.95:  errors.append('Ref_fit')
-    if max_trans is not None and max_trans < -10.0: errors.append('Low_transmission')
-    data['ErrorFlag']         = len(errors)
-    data['Error description'] = ', '.join(errors) if errors else 'No Error'
-    return data
 
 
 def fit_polynomials(wavelengths: np.ndarray, transmissions: np.ndarray,
@@ -146,7 +75,7 @@ def fit_polynomials(wavelengths: np.ndarray, transmissions: np.ndarray,
     results = {}
     for order in orders:
         with warnings.catch_warnings():
-            warnings.simplefilter("ignore", np.exceptions.RankWarning)
+            warnings.filterwarnings("ignore", message="Polyfit may be poorly conditioned")
             coeffs = np.polyfit(wavelengths, transmissions, order)
         fitted = np.polyval(coeffs, wavelengths)
         results[order] = {'coeffs': coeffs, 'fitted': fitted, 'r2': r_squared(transmissions, fitted)}
@@ -159,10 +88,10 @@ def remove_residual_baseline(wl: np.ndarray, y: np.ndarray,
     mask = y >= threshold
     x_fit, y_fit = wl[mask], y[mask]
     weights = np.ones_like(x_fit)
-    weights[0] = 20
-    weights[-1] = 5
+    weights[0] = 3
+    weights[-1] = 2
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", np.exceptions.RankWarning)
+        warnings.filterwarnings("ignore", message="Polyfit may be poorly conditioned")
         coeffs = np.polyfit(x_fit, y_fit, degree, w=weights)
     baseline = np.polyval(coeffs, wl)
     return y - baseline, baseline
@@ -185,48 +114,71 @@ def fit_mzi(wavelength: np.ndarray, T_raw_dB: np.ndarray,
     prior = FSR_PRIOR.get(device_type.upper(), FSR_PRIOR['LMZC'])
     dλ    = wavelength[1] - wavelength[0]
 
+    FSR_pts = int(round(prior['center'] / dλ))
+
     if ref_wl is not None and ref_dB is not None:
-        # reference 보간 후 차감 → 파장 전체에 걸쳐 일관된 baseline 제거
+        # reference 보간 후 차감 → 파장 전체 일관된 baseline 제거
         ref_interp = np.interp(wavelength, ref_wl, ref_dB)
         T_flat_dB  = T_raw_dB - ref_interp
-        T_flat     = 10.0 ** (T_flat_dB / 10.0)
-        T_norm     = T_flat / np.clip(T_flat.max(), 1e-12, None)
+        # 잔류 선형 기울기 제거 (degree=1: 단순 tilt만 보정, 과적합 방지)
+        T_flat_dB, _ = remove_residual_baseline(wavelength, T_flat_dB,
+                                                 degree=1, top_percent=20)
+        T_flat = 10.0 ** (T_flat_dB / 10.0)
+        T_norm = T_flat / np.clip(T_flat.max(), 1e-12, None)
     else:
         # fallback: reference 없을 때 envelope 정규화
-        T_lin   = 10.0 ** (T_raw_dB / 10.0)
-        FSR_pts = int(round(prior['center'] / dλ))
-        w1      = 3 * FSR_pts
-        env1    = uniform_filter1d(T_lin, size=w1, mode='nearest')
-        s1      = T_lin / np.clip(env1, 1e-12, None)
-        w2      = int(1.5 * FSR_pts)
-        env2    = uniform_filter1d(s1, size=w2, mode='nearest')
-        T_flat  = s1 / np.clip(env2, 1e-12, None)
+        T_lin = 10.0 ** (T_raw_dB / 10.0)
+        w1    = 3 * FSR_pts
+        env1  = uniform_filter1d(T_lin, size=w1, mode='nearest')
+        s1    = T_lin / np.clip(env1, 1e-12, None)
+        w2    = int(1.5 * FSR_pts)
+        env2  = uniform_filter1d(s1, size=w2, mode='nearest')
+        T_flat    = s1 / np.clip(env2, 1e-12, None)
         T_flat_dB = 10 * np.log10(np.clip(T_flat, 1e-9, None))
         T_norm    = T_flat / T_flat.max()
 
     T_flat_dB = 10 * np.log10(np.clip(T_norm, 1e-9, None))
 
-    FSR_pts = int(round(prior['center'] / dλ))
-    sig_ac = T_norm - T_norm.mean()
-    ac     = np.correlate(sig_ac, sig_ac, mode='full')[len(sig_ac)-1:]
-    peaks  = argrelmax(ac, order=max(1, int(FSR_pts * 0.3)))[0]
-    FSR_g  = peaks[0] * dλ if len(peaks) else prior['center']
-    FSR_g  = float(np.clip(FSR_g, prior['min'], prior['max']))
+    # FSR / lam0 추정: 딥(로컬 최솟값) 위치 기반
+    min_order = max(1, int(FSR_pts * 0.3))
+    dip_idx   = argrelmin(T_norm, order=min_order)[0]
 
-    # A 하한 1e-4 = -40 dB floor (전 파장 범위에 걸쳐 일관 적용)
-    p0 = [0.01, 0.97, FSR_g,        wavelength[0]]
-    lo = [1e-4, 0.50, prior['min'], wavelength[0] - 5.0]
-    hi = [0.35, 1.05, prior['max'], wavelength[-1]]
+    if len(dip_idx) >= 2:
+        # 여러 딥 간격의 중앙값 → FSR 추정 (단일 피크보다 안정적)
+        dip_spacings = np.diff(wavelength[dip_idx])
+        FSR_g = float(np.median(dip_spacings))
+        FSR_g = float(np.clip(FSR_g, prior['min'], prior['max']))
+        # lam0 = 첫 번째 딥 위치에서 FSR/2 앞 (피크 위치)
+        lam0_g = wavelength[dip_idx[0]] - FSR_g / 2
+    elif len(dip_idx) == 1:
+        FSR_g  = float(np.clip(prior['center'], prior['min'], prior['max']))
+        lam0_g = wavelength[dip_idx[0]] - FSR_g / 2
+    else:
+        # fallback: 자기상관
+        sig_ac   = T_norm - T_norm.mean()
+        ac       = np.correlate(sig_ac, sig_ac, mode='full')[len(sig_ac)-1:]
+        ac_peaks = argrelmax(ac, order=min_order)[0]
+        FSR_g    = ac_peaks[0] * dλ if len(ac_peaks) else prior['center']
+        FSR_g    = float(np.clip(FSR_g, prior['min'], prior['max']))
+        t_peaks  = argrelmax(T_norm, order=min_order)[0]
+        lam0_g   = wavelength[t_peaks[0]] if len(t_peaks) > 0 else wavelength[0]
+
+    # A floor 제거: 실제 소광비(ER)를 정확하게 추출
+    p0 = [0.01, 0.97, FSR_g,       lam0_g]
+    lo = [1e-4, 0.30, prior['min'], wavelength[0]  - FSR_g]
+    hi = [0.50, 1.00, prior['max'], wavelength[-1] + FSR_g]
 
     try:
         popt, _ = curve_fit(mzi_model, wavelength, T_norm,
                             p0=p0, bounds=(lo, hi), maxfev=40000)
     except Exception:
-        popt, _ = curve_fit(mzi_model, wavelength, T_norm, p0=p0, maxfev=80000)
+        popt, _ = curve_fit(mzi_model, wavelength, T_norm,
+                            p0=p0, bounds=(lo, hi), maxfev=80000)
 
     A, B, FSR, lam0 = popt
     T_fit_norm = mzi_model(wavelength, *popt)
-    R2 = r_squared(T_norm, T_fit_norm)
+    R2  = r_squared(T_norm, T_fit_norm)
+    ER  = float(-10 * np.log10(np.clip(A, 1e-12, None)))  # 소광비 [dB]
 
     return {
         'T_norm':     T_norm,
@@ -234,11 +186,15 @@ def fit_mzi(wavelength: np.ndarray, T_raw_dB: np.ndarray,
         'T_norm_dB':  10 * np.log10(np.clip(T_norm,     1e-9, None)),
         'T_fit_dB':   10 * np.log10(np.clip(T_fit_norm, 1e-9, None)),
         'T_flat_dB':  T_flat_dB,
-        'A': A, 'B': B, 'FSR': FSR, 'lam0': lam0, 'R2': R2,
+        'A': A, 'B': B, 'FSR': FSR, 'lam0': lam0, 'R2': R2, 'ER': ER,
     }
 
 
-Vt = 0.02585
+# 다이오드 열전압 상수 (GPDO와 동일 방식)
+_q  = 1.602e-19   # 전자 전하 [C]
+_k  = 1.381e-23   # 볼츠만 상수 [J/K]
+_T  = 300.0       # 상온 [K]
+Vt  = _k * _T / _q  # 열전압 ≈ 0.02585 V
 
 def diode_model(V: np.ndarray, Is: float, n: float) -> np.ndarray:
     return Is * (np.exp(V / (n * Vt)) - 1)

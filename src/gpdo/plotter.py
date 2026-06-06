@@ -77,8 +77,10 @@ class Plotter:
         # ── 그림 생성 ─────────────────────────────────
         fig, axes = plt.subplots(3, 2, figsize=(20, 15))
         plt.subplots_adjust(hspace=0.50, wspace=0.32)
+        stem = (os.path.splitext(fname)[0] if fname
+                else f'{wafer_id} ({col},{row})')
         fig.suptitle(
-            f"{fname or f'{wafer_id} ({col},{row})'}  GPDO_PDK\n"
+            f"{stem}\n"
             f"Fiber: {raw['fiber_dbm']:.2f} dBm  |  "
             f"Pin: {resp['P_in_dbm']:.2f} dBm  |  "
             f"R = {R:.3f} A/W",
@@ -100,7 +102,7 @@ class Plotter:
                         if fname else f"{wafer_id}_({col},{row})_analysis.png")
             fpath = os.path.join(save_dir, png_name)
             fig.savefig(fpath, dpi=150, bbox_inches="tight")
-            print(f"       💾 저장: {fpath}")
+            print(f"       저장: {fpath}")
         plt.close(fig)
 
     # ══════════════════════════════════════════════════
@@ -164,7 +166,7 @@ class Plotter:
                 label=f"Min {raw['IL_ref'][im]:.2f} dBm")
         ax.axvline(raw['lc_wl'], color=cls.ORANGE, lw=1.2, ls=":", alpha=0.8,
                    label=f"$\\lambda$={raw['lc_wl']:.0f} nm")
-        ax.set(xlabel="Wavelength (nm)", ylabel="IL (dBm)",
+        ax.set(xlabel="Wavelength [nm]", ylabel="IL [dBm]",
                title="Reference Spectrum")
         ax.set_title("Reference Spectrum", fontweight="bold")
         ax.legend(fontsize=7.5)
@@ -188,8 +190,8 @@ class Plotter:
                 fontsize=7.5, va="top", family="monospace",
                 bbox=dict(boxstyle="round,pad=0.3",
                           facecolor="#E3F2FD", alpha=0.9))
-        ax.set(xlabel="Voltage (V)", ylabel="|Current| ($\\mu$A)")
-        ax.set_title("Dark Current I–V  [Log Scale]", fontweight="bold")
+        ax.set(xlabel="Voltage [V]", ylabel="|Current| [$\\mu$A]")
+        ax.set_title("Dark Current I–V (Log Scale)", fontweight="bold")
         ax.legend(fontsize=7.5)
         ax.grid(True, alpha=0.25, which="both")
 
@@ -214,9 +216,9 @@ class Plotter:
                 fontsize=7.5, va="top", family="monospace",
                 bbox=dict(boxstyle="round,pad=0.3",
                           facecolor="#E8F5E9", alpha=0.9))
-        ax.set(xlabel="Voltage (V)", ylabel="|Current| ($\\mu$A)")
+        ax.set(xlabel="Voltage [V]", ylabel="|Current| [$\\mu$A]")
         ax.set_title(
-            f"Light Current I–V  [Log Scale]  $\\lambda$={raw['lc_wl']:.0f} nm",
+            f"Light Current I–V (Log Scale)  $\\lambda$={raw['lc_wl']:.0f} nm",
             fontweight="bold")
         ax.legend(fontsize=7.5)
         ax.grid(True, alpha=0.25, which="both")
@@ -235,8 +237,8 @@ class Plotter:
                 fontsize=8, va="top", family="monospace",
                 bbox=dict(boxstyle="round,pad=0.3",
                           facecolor="#FCE4EC", alpha=0.9))
-        ax.set(xlabel="Voltage (V)", ylabel="|Photo Current| ($\\mu$A)")
-        ax.set_title("Photo Current  [Log Scale]", fontweight="bold")
+        ax.set(xlabel="Voltage [V]", ylabel="|Photo Current| [$\\mu$A]")
+        ax.set_title("Photo Current (Log Scale)", fontweight="bold")
         ax.legend(fontsize=7.5)
         ax.grid(True, alpha=0.25, which="both")
 
@@ -259,7 +261,7 @@ class Plotter:
                 transform=ax.transAxes, fontsize=8, ha="right", va="bottom",
                 bbox=dict(boxstyle="round,pad=0.3",
                           facecolor="white", alpha=0.8))
-        ax.set(xlabel="Wavelength (nm)", ylabel="|Current| ($\\mu$A)")
+        ax.set(xlabel="Wavelength [nm]", ylabel="|Current| [$\\mu$A]")
         ax.set_title("Light Current Spectrum", fontweight="bold")
         ax.legend(fontsize=7.5)
         ax.grid(True, alpha=0.25)
@@ -280,8 +282,8 @@ class Plotter:
                 transform=ax.transAxes, fontsize=8, ha="right", va="bottom",
                 bbox=dict(boxstyle="round,pad=0.3",
                           facecolor="white", alpha=0.8))
-        ax.set(xlabel="Wavelength (nm)",
-               ylabel="Responsivity $R(\\lambda)$ (A/W)")
+        ax.set(xlabel="Wavelength [nm]",
+               ylabel="Responsivity $R(\\lambda)$ [A/W]")
         ax.set_title("Wavelength-dependent Responsivity $R(\\lambda)$",
                      fontweight="bold")
         ax.legend(loc="upper left", fontsize=7.5)
