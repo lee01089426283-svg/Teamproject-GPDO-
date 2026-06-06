@@ -102,9 +102,24 @@ FSR_PRIOR = {
     'LMZO': {'center':  9.87, 'min':  6.0, 'max': 13.0},
 }
 
-def mzi_model(lam: np.ndarray, A: float, B: float,
-              FSR: float, lam0: float) -> np.ndarray:
-    return A + B * np.cos(np.pi * (lam - lam0) / FSR) ** 2
+# MZI 피팅 시 소광비 floor를 -40 dB로 고정
+_MZI_FLOOR_DB  = -40.0
+_MZI_FLOOR_LIN = 10 ** (_MZI_FLOOR_DB / 10)   # ≈ 1e-4
+
+def _mzi_fixed_floor(lam: np.ndarray, a: float, b: float,
+                     t_max: float) -> np.ndarray:
+    """
+    floor = _MZI_FLOOR_LIN 로 고정된 MZI 전송 모델.
+
+    T(λ) = c + d·cos(a·λ + b)
+      c = (t_max + floor) / 2   ← 수직 오프셋
+      d = (t_max - floor) / 2   ← 진폭
+    → T_min = floor, T_max = t_max
+    """
+    c = (t_max + _MZI_FLOOR_LIN) / 2
+    d = (t_max - _MZI_FLOOR_LIN) / 2
+    return c + d * np.cos(a * lam + b)
+
 
 def fit_mzi(wavelength: np.ndarray, T_raw_dB: np.ndarray,
             bias_voltage: float = -1.0,
@@ -139,22 +154,19 @@ def fit_mzi(wavelength: np.ndarray, T_raw_dB: np.ndarray,
 
     T_flat_dB = 10 * np.log10(np.clip(T_norm, 1e-9, None))
 
-    # FSR / lam0 추정: 딥(로컬 최솟값) 위치 기반
+    # ── FSR / lam0 초기 추정: 딥(로컬 최솟값) 위치 기반 ──────────
     min_order = max(1, int(FSR_pts * 0.3))
     dip_idx   = argrelmin(T_norm, order=min_order)[0]
 
     if len(dip_idx) >= 2:
-        # 여러 딥 간격의 중앙값 → FSR 추정 (단일 피크보다 안정적)
         dip_spacings = np.diff(wavelength[dip_idx])
         FSR_g = float(np.median(dip_spacings))
         FSR_g = float(np.clip(FSR_g, prior['min'], prior['max']))
-        # lam0 = 첫 번째 딥 위치에서 FSR/2 앞 (피크 위치)
         lam0_g = wavelength[dip_idx[0]] - FSR_g / 2
     elif len(dip_idx) == 1:
         FSR_g  = float(np.clip(prior['center'], prior['min'], prior['max']))
         lam0_g = wavelength[dip_idx[0]] - FSR_g / 2
     else:
-        # fallback: 자기상관
         sig_ac   = T_norm - T_norm.mean()
         ac       = np.correlate(sig_ac, sig_ac, mode='full')[len(sig_ac)-1:]
         ac_peaks = argrelmax(ac, order=min_order)[0]
@@ -163,22 +175,34 @@ def fit_mzi(wavelength: np.ndarray, T_raw_dB: np.ndarray,
         t_peaks  = argrelmax(T_norm, order=min_order)[0]
         lam0_g   = wavelength[t_peaks[0]] if len(t_peaks) > 0 else wavelength[0]
 
-    # A floor 제거: 실제 소광비(ER)를 정확하게 추출
-    p0 = [0.01, 0.97, FSR_g,       lam0_g]
-    lo = [1e-4, 0.30, prior['min'], wavelength[0]  - FSR_g]
-    hi = [0.50, 1.00, prior['max'], wavelength[-1] + FSR_g]
+    # ── 고정 floor 모델 피팅 ────────────────────────────────────
+    # a = 2π/FSR,  b: 위상 (peak 위치 lam0_g에서 cos=1 되도록 초기화)
+    a0 = 2 * np.pi / FSR_g
+    b0 = (-a0 * lam0_g) % (2 * np.pi)   # [0, 2π) 범위로 정규화
+
+    p0 = [a0,                   b0,   1.0]
+    lo = [2*np.pi/prior['max'], -np.inf, 0.5]
+    hi = [2*np.pi/prior['min'],  np.inf, 1.5]
 
     try:
-        popt, _ = curve_fit(mzi_model, wavelength, T_norm,
+        popt, _ = curve_fit(_mzi_fixed_floor, wavelength, T_norm,
                             p0=p0, bounds=(lo, hi), maxfev=40000)
     except Exception:
-        popt, _ = curve_fit(mzi_model, wavelength, T_norm,
+        popt, _ = curve_fit(_mzi_fixed_floor, wavelength, T_norm,
                             p0=p0, bounds=(lo, hi), maxfev=80000)
 
-    A, B, FSR, lam0 = popt
-    T_fit_norm = mzi_model(wavelength, *popt)
+    a_fit, b_fit, t_max_fit = popt
+    FSR  = 2 * np.pi / a_fit
+
+    # 피크 위치 lam0: cos(a·lam0 + b) = 1 → a·lam0 + b = 2π·k
+    k    = int(np.round((a_fit * float(wavelength.mean()) + b_fit) / (2 * np.pi)))
+    lam0 = (-b_fit + 2 * np.pi * k) / a_fit
+
+    T_fit_norm = _mzi_fixed_floor(wavelength, *popt)
     R2  = r_squared(T_norm, T_fit_norm)
-    ER  = float(-10 * np.log10(np.clip(A, 1e-12, None)))  # 소광비 [dB]
+
+    # 소광비: T_max / T_min = t_max_fit / FLOOR_LIN
+    ER  = float(10 * np.log10(np.clip(t_max_fit / _MZI_FLOOR_LIN, 1e-12, None)))
 
     return {
         'T_norm':     T_norm,
@@ -186,7 +210,8 @@ def fit_mzi(wavelength: np.ndarray, T_raw_dB: np.ndarray,
         'T_norm_dB':  10 * np.log10(np.clip(T_norm,     1e-9, None)),
         'T_fit_dB':   10 * np.log10(np.clip(T_fit_norm, 1e-9, None)),
         'T_flat_dB':  T_flat_dB,
-        'A': A, 'B': B, 'FSR': FSR, 'lam0': lam0, 'R2': R2, 'ER': ER,
+        'FSR': FSR, 'lam0': lam0, 'R2': R2, 'ER': ER,
+        'A': _MZI_FLOOR_LIN, 'B': t_max_fit - _MZI_FLOOR_LIN,  # 하위 호환
     }
 
 

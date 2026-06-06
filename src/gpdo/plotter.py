@@ -40,7 +40,8 @@ class Plotter:
     def plot(cls, raw: dict, ref_r: dict, df: dict, dr: dict,
              lf: dict, pc: dict, resp: dict,
              save_dir: str = None, wafer_id: str = "D08",
-             fname: str = None) -> None:
+             fname: str = None,
+             error_messages: list = None) -> None:
         """
         6-패널 분석 그래프를 생성하고 PNG로 저장.
 
@@ -93,6 +94,25 @@ class Plotter:
         cls._panel_photo(  axes[1,1], raw, I_photo, ptxt_photo)
         cls._panel_spec(   axes[2,0], raw)
         cls._panel_rlambda(axes[2,1], raw, R_lambda)
+
+        # ── 측정 데이터 오류 오버레이 ─────────────────
+        if error_messages:
+            fig.suptitle(
+                f"{stem}\n[!] Measurement Data Error  (Not a code error)",
+                fontsize=12, fontweight="bold",
+            )
+            error_ax = fig.add_axes([0, 0, 1, 1])
+            error_ax.axis('off')
+            error_ax.patch.set_alpha(0)
+            error_text = '\n'.join(f'- {e}' for e in error_messages)
+            error_ax.text(0.5, 0.5,
+                          f'Measurement Data Error\n\n{error_text}',
+                          ha='center', va='center', fontsize=16,
+                          color='red', fontweight='bold',
+                          transform=error_ax.transAxes,
+                          bbox=dict(boxstyle='round,pad=1.2',
+                                    facecolor='lightyellow',
+                                    edgecolor='red', linewidth=3, alpha=0.92))
 
         # ── 저장 ──────────────────────────────────────
         if save_dir:

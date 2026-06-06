@@ -35,6 +35,62 @@ class Plotter:
         return cls.plot_from_root(root, basename, save_dir=save_dir, verbose=verbose)
 
     @classmethod
+    def _check_iv_errors(cls, root) -> dict:
+        """
+        IV 측정 데이터 품질을 검사해 오류 플래그 dict 반환.
+
+        반환 키
+        -------
+        iv_flat      : 전류가 노이즈 수준(<1nA)으로 flat — 측정 불량
+        iv_no_diode  : forward bias에서 지수 증가 없음 — junction 불량
+        errors       : list[str] — 사람이 읽을 수 있는 오류 설명
+        """
+        result = {'iv_flat': False, 'iv_no_diode': False, 'errors': []}
+
+        iv = root.find('.//{*}IVMeasurement')
+        if iv is None:
+            return result
+
+        v_elem = iv.find('.//{*}Voltage')
+        i_elem = iv.find('.//{*}Current')
+        if v_elem is None or i_elem is None:
+            return result
+
+        try:
+            v = np.array([float(x) for x in v_elem.text.split(',') if x.strip()])
+            i = np.array([float(x) for x in i_elem.text.split(',') if x.strip()])
+        except Exception:
+            return result
+
+        # ① 전체 전류가 노이즈 수준(< 1nA) → 측정 불량
+        if np.max(np.abs(i)) < 1e-9:
+            result['iv_flat'] = True
+            result['errors'].append('IV Error: Current at noise level (<1 nA)')
+
+        # ② forward bias(V > 0.3V)에서 지수 증가 없음 → junction 불량
+        fwd_mask = v > 0.3
+        if fwd_mask.sum() >= 2:
+            i_fwd = np.abs(i[fwd_mask])
+            # 최대/최소 비율이 10배 미만이면 flat으로 판단
+            if i_fwd.min() > 0 and i_fwd.max() / i_fwd.min() < 10:
+                result['iv_no_diode'] = True
+                result['errors'].append('IV Error: No diode characteristic in forward bias')
+
+        return result
+
+    @classmethod
+    def _add_error_overlay(cls, ax, messages: list[str]) -> None:
+        """서브플롯 위에 빨간 오류 박스를 오버레이."""
+        text = '\n'.join(messages)
+        ax.text(0.5, 0.5, f'[!] Measurement Data Error\n\n{text}',
+                transform=ax.transAxes,
+                fontsize=9, color='red', fontweight='bold',
+                ha='center', va='center',
+                bbox=dict(boxstyle='round,pad=0.6',
+                          facecolor='lightyellow', edgecolor='red',
+                          linewidth=2, alpha=0.92))
+
+    @classmethod
     def plot_from_root(cls, root, basename: str,
                        save_dir: str = None,
                        verbose: bool = True,
@@ -43,6 +99,12 @@ class Plotter:
         fig, axes = plt.subplots(2, 3, figsize=(18, 10))
 
         stem = os.path.splitext(basename)[0]
+
+        # IV 오류 감지
+        iv_errors = cls._check_iv_errors(root)
+        has_error = bool(iv_errors['errors'])
+
+        # 제목 구성
         if extra_info:
             er  = extra_info.get('Extinction Ratio (dB)')
             fsr = extra_info.get('FSR (nm)')
@@ -50,10 +112,15 @@ class Plotter:
             if er  is not None: parts.append(f"ER: {er:.1f} dB")
             if fsr is not None: parts.append(f"FSR: {fsr:.3f} nm")
             subtitle = '  |  '.join(parts)
-            fig.suptitle(f'{stem}\n{subtitle}', fontsize=11, fontweight='bold')
+            title = f'{stem}\n{subtitle}'
         else:
-            fig.suptitle(stem, fontsize=11, fontweight='bold')
+            title = stem
 
+        if has_error:
+            title += '\n[!] Measurement Data Error  (Not a code error)'
+        fig.suptitle(title, fontsize=11, fontweight='bold')
+
+        # 6개 패널 항상 그리기
         cls._panel_transmission_spectra(axes[0, 0], root)
         cls._panel_ref_fitting(         axes[0, 1], root)
         cls._panel_flat_spectra(        axes[0, 2], root)
@@ -61,7 +128,22 @@ class Plotter:
         cls._panel_iv_raw(              axes[1, 1], root)
         cls._panel_iv_fitting(          axes[1, 2], root)
 
-        top = 0.94 if extra_info else 0.96
+        if has_error:
+            # 6개 패널 위에 에러 박스 오버레이
+            error_ax = fig.add_axes([0, 0, 1, 1])
+            error_ax.axis('off')
+            error_ax.patch.set_alpha(0)
+            error_text = '\n'.join(f'- {e}' for e in iv_errors['errors'])
+            error_ax.text(0.5, 0.5,
+                          f'Measurement Data Error\n\n{error_text}',
+                          ha='center', va='center', fontsize=16,
+                          color='red', fontweight='bold',
+                          transform=error_ax.transAxes,
+                          bbox=dict(boxstyle='round,pad=1.2',
+                                    facecolor='lightyellow', edgecolor='red',
+                                    linewidth=3, alpha=0.92))
+
+        top = 0.92 if (extra_info or has_error) else 0.96
         plt.tight_layout(rect=[0, 0, 1, top])
 
         out_path = ''

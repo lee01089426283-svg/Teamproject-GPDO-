@@ -113,6 +113,26 @@ class GPDOAnalyzer:
 
         return results
 
+    @staticmethod
+    def _check_data_quality(raw: dict) -> list[str]:
+        """측정 데이터 품질 검사. 오류 메시지 리스트 반환 (정상이면 빈 리스트)."""
+        errors = []
+        i_dark = raw['I_dark']
+
+        # ① 전류가 노이즈 수준(<1nA) — probe contact 불량 등
+        if np.max(np.abs(i_dark)) < 1e-9:
+            errors.append('IV Error: Current at noise level (<1 nA)')
+
+        # ② forward bias에서 지수 증가 없음 — junction 불량
+        v_dark = raw['V_dark']
+        fwd_mask = v_dark > 0.3
+        if fwd_mask.sum() >= 2:
+            i_fwd = np.abs(i_dark[fwd_mask])
+            if i_fwd.min() > 0 and i_fwd.max() / i_fwd.min() < 10:
+                errors.append('IV Error: No diode characteristic in forward bias')
+
+        return errors
+
     def _process_one(self, xml_path: str, png_dir: str) -> dict | None:
         """XML 1개 파싱 → 피팅 → 플롯 → result dict 반환."""
         fname = os.path.basename(xml_path)
@@ -121,6 +141,11 @@ class GPDOAnalyzer:
         except Exception as e:
             print(f"       ⚠ 파싱 실패 [{fname}]: {e}")
             return None
+
+        # 측정 데이터 품질 검사
+        data_errors = self._check_data_quality(raw)
+        if data_errors:
+            print(f"       ⚠ 측정 데이터 오류 [{fname}]: {data_errors}")
 
         try:
             ref_r = FittingEngine.fit_reference(raw['L_ref'], raw['IL_ref'])
@@ -138,16 +163,22 @@ class GPDOAnalyzer:
                            pc['Iph'], raw['fiber_dbm'], il_at_wl)
         except Exception as e:
             print(f"       ⚠ 피팅 실패 [{fname}]: {e}")
+            if data_errors:
+                self._save_error_png(raw, data_errors, png_dir, fname)
             return None
 
-        # 플롯 저장 (png/ 하위 폴더)
+        # 플롯 저장 (png/ 하위 폴더) — 데이터 오류 시 에러 오버레이 포함
         try:
             Plotter.plot(raw, ref_r, df, dr, lf, pc, resp,
                          save_dir=png_dir,
                          wafer_id=self.wafer_id,
-                         fname=fname)
+                         fname=fname,
+                         error_messages=data_errors if data_errors else None)
         except Exception as e:
             print(f"       ⚠ 플롯 실패 [{fname}]: {e}")
+
+        if data_errors:
+            return None  # CSV 행에는 포함하지 않음
 
         # 스펙트럼 피크 파장
         peak_wl = (float(raw['L_spec'][np.argmax(np.abs(raw['I_spec']))])
@@ -168,6 +199,30 @@ class GPDOAnalyzer:
             r2_fwd   = df['r2'],
             r2_photo = r2_photo,
         )
+
+    @staticmethod
+    def _save_error_png(raw: dict, errors: list, png_dir: str, fname: str) -> None:
+        """피팅 자체 실패 시 에러 메시지만 담은 fallback PNG 저장."""
+        import matplotlib.pyplot as plt
+        stem = os.path.splitext(fname)[0]
+        fig, ax = plt.subplots(figsize=(12, 8))
+        ax.axis('off')
+        error_text = '\n'.join(f'- {e}' for e in errors)
+        ax.text(0.5, 0.5,
+                f'Measurement Data Error\n\n{error_text}',
+                ha='center', va='center', fontsize=16,
+                color='red', fontweight='bold',
+                transform=ax.transAxes,
+                bbox=dict(boxstyle='round,pad=1.2',
+                          facecolor='lightyellow',
+                          edgecolor='red', linewidth=3))
+        fig.suptitle(f'{stem}\n[!] Measurement Data Error  (Not a code error)',
+                     fontsize=11, fontweight='bold')
+        os.makedirs(png_dir, exist_ok=True)
+        out = os.path.join(png_dir, fname.replace('.xml', '.png'))
+        fig.savefig(out, dpi=150, bbox_inches='tight')
+        plt.close(fig)
+        print(f"       저장: {out}")
 
     def _plot_heatmaps(self, results: list, save_dir: str) -> None:
         """타임스탬프별 히트맵 일괄 생성."""
