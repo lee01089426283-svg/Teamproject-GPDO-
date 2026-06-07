@@ -1,216 +1,277 @@
-# GPDO Wafer Analyzer
+# 🔬 Silicon Photonics Wafer Analyzer
 
-> **Germanium Photodetector (GPDO) XML 측정 데이터를 자동으로 파싱·피팅·시각화하는 웨이퍼 분석 파이프라인**
+> 반도체 웨이퍼 광소자(GPDO / MZM)의 XML 측정 데이터를 자동으로 파싱·피팅·시각화하는 분석 파이프라인
 
----
-
-## 왜 만들었나?
-
-광소자 공정 연구에서 웨이퍼 한 장에는 수십 개의 GPDO 다이가 있고, 다이마다 XML 측정 파일이 생성됩니다.
-이 파일들을 수작업으로 열어 그래프를 그리고 파라미터를 뽑아내는 작업은 시간이 오래 걸리고 실수가 생기기 쉽습니다.
-
-이 프로젝트는 다음을 자동화합니다.
-
-| 단계 | 내용 |
-|------|------|
-| **파싱** | GPDO XML에서 Dark/Light/Spectrum 전류, Reference IL 추출 |
-| **피팅** | Shockley 다이오드 모델, Power-law 역바이어스, 광전류 계산 |
-| **시각화** | 다이별 6-패널 PNG + 웨이퍼 전체 히트맵 |
-| **CSV 출력** | 다이별 핵심 파라미터(Iph, n, R, peak λ 등) 정리 |
+![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Device](https://img.shields.io/badge/device-GPDO%20%7C%20LMZC%20%7C%20LMZO-orange)
 
 ---
 
-## 분석 파라미터 설명
+## 📖 1. 프로젝트 소개 (About The Project)
 
-| 파라미터 | 기호 | 설명 |
-|----------|------|------|
-| 광전류 | `Iph` | 역바이어스(-1.5V 이하)에서 Light − Dark 차감으로 추출한 포토커런트 |
-| 이상계수 | `n_d` | Shockley 다이오드 이상계수. 1에 가까울수록 이상적인 pn 접합 |
-| 응답도 | `R_resp` | 단위 광파워당 전류 [A/W]. GPDO 성능의 핵심 지표 |
-| 측정 파장 | `lc_wl` | Light Current 측정에 사용된 단일 파장 [nm] |
-| 스펙트럼 피크 파장 | `peak_wl` | 파장 스윕에서 전류가 최대인 파장 [nm] |
-| 순방향 R² | `r2_fwd` | 순방향 Dark Current 피팅 결정계수 (1에 가까울수록 피팅 품질 우수) |
-| 광전류 R² | `r2_photo` | 역바이어스 구간 광전류 포화 균일도 (1에 가까울수록 안정적인 포화) |
+실리콘 포토닉스 공정에서 웨이퍼 한 장에는 수십 개의 광소자 다이(die)가 존재하며, 각 다이마다 별도의 XML 측정 파일이 생성됩니다. 이 파일들을 수작업으로 열어 그래프를 그리고 파라미터를 추출하는 작업은 시간이 오래 걸리고 실수가 발생하기 쉽습니다.
+
+이 프로젝트는 **GPDO(Germanium Photodetector)** 와 **MZM(Mach-Zehnder Modulator)** 두 종류의 광소자에 대해 파싱부터 피팅, 시각화, CSV 출력까지의 전 과정을 완전히 자동화합니다.
+
+특히 측정 데이터 자체의 품질 이상(probe contact 불량, 노이즈 수준 전류 등)을 자동으로 감지해 결과물에 명시적으로 표시하는 기능을 포함하고 있어, **코드 오류와 측정 오류를 명확히 구분**할 수 있습니다.
+
+### ✨ 주요 기능 (Key Features)
+
+* 📂 **자동 데이터 탐색** — `data/` 폴더 하위의 프로젝트명·웨이퍼·타임스탬프 구조를 자동으로 인식
+* 📈 **다이별 6-패널 분석 그래프** — GPDO(IV 피팅, 응답도) / MZM(MZI 피팅, 소광비, FSR) PNG 자동 생성
+* 🗺️ **웨이퍼 히트맵** — 웨이퍼 내 다이 위치별 파라미터 분포를 색상으로 시각화
+* 🚨 **측정 데이터 오류 자동 감지** — 노이즈 수준 전류·다이오드 특성 부재 탐지 후 오류 오버레이 표시
+* 📊 **CSV 자동 저장** — 웨이퍼별 + 전체 통합 `Total_Result.csv` 자동 생성
+
+### 🛠 기술 스택 (Built With)
+
+* `Python 3.10+`
+* `NumPy` / `SciPy` — 수치 계산 및 커브 피팅 (`curve_fit`)
+* `Matplotlib` — 6-패널 그래프 및 히트맵 시각화 (Agg 백엔드, GUI 없음)
+* `Pandas` — CSV 생성 및 통합
+* `xml.etree.ElementTree` — XML 측정 파일 파싱
 
 ---
 
-## 빠른 시작
+## 📸 2. 결과물 미리보기 (Screenshots)
 
-### 1. 설치
+### GPDO — 다이 단위 6-패널 분석 그래프
+> Reference Spectrum · Dark/Light IV · Photo Current · Spectrum · Responsivity R(λ)
+
+![GPDO 6-panel](res/png/GPDO/HY202103/D08/20190526_082853/HY202103_D08_(0,2)_LION1_DCM_GPDO.png)
+
+---
+
+### MZM — 다이 단위 6-패널 분석 그래프
+> Transmission Spectra · Ref Fitting · Flat Spectra · MZI Fitting · IV Measurement · IV Analysis
+
+![MZM 6-panel](res/png/MZM/HY202103/D08/20190526_082853/HY202103_D08_(0,2)_LION1_DCM_LMZO.png)
+
+---
+
+### 측정 데이터 오류 감지 — Error Overlay
+> probe contact 불량 등으로 IV 데이터가 비정상인 경우, 6개 패널 위에 오류 박스를 오버레이합니다.
+
+![Error Overlay](res/png/MZM/HY202103/D23/20190531_072042/HY202103_D23_(0,0)_LION1_DCM_LMZO.png)
+
+---
+
+### 웨이퍼 히트맵 — GPDO Responsivity / MZM Extinction Ratio
+
+| GPDO — Responsivity [A/W] | MZM — Extinction Ratio [dB] |
+|:---:|:---:|
+| ![GPDO Heatmap](res/png/GPDO/HY202103/D08/20190526_082853/heatmap/heatmap_R_resp.png) | ![MZM Heatmap](res/png/MZM/HY202103/D08/20190526_082853/heatmap/heatmap_Extinction_Ratio_(dB).png) |
+
+---
+
+## 💻 3. 시작하기 (Getting Started)
+
+### 요구 사항 (Prerequisites)
+
+* Python **3.10** 이상
+* 가상환경(venv) 세팅 권장
+
+### 설치 가이드 (Installation)
+
+1. 저장소 클론
+
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git
+   cd YOUR_REPO
+   ```
+
+2. 필수 패키지 설치
+
+   ```bash
+   pip install numpy scipy matplotlib pandas lxml
+   ```
+
+3. 측정 데이터 배치
+
+   ```
+   data/
+   └── HY202103/               ← 프로젝트 폴더명 (자동 인식)
+       ├── D07/
+       │   └── 20190715_190855/
+       │       ├── HY202103_D07_(0,0)_LION1_DCM_LMZC.xml
+       │       └── ...
+       ├── D08/
+       │   └── 20190526_082853/
+       │       ├── HY202103_D08_(0,0)_LION1_DCM_GPDO.xml
+       │       ├── HY202103_D08_(0,0)_LION1_DCM_LMZO.xml
+       │       └── ...
+       ├── D23/
+       └── D24/
+   ```
+
+   > `data/` 하위 폴더 구조(프로젝트명 → 웨이퍼ID → 타임스탬프)를 자동 탐색하므로, `config.py` 수정 없이 폴더만 추가하면 됩니다.
+
+---
+
+## 🚀 4. 사용 방법 (Usage)
 
 ```bash
-pip install numpy scipy matplotlib lxml pandas
-```
-
-### 2. 데이터 배치
-
-```
-data/
-└── HY202103/           ← config.py의 PROJECT_NAME과 일치
-    ├── D08/
-    │   └── 20190526_082853/
-    │       ├── HY202103_D08_(-1,-1)_LION1_DCM_GPDO.xml
-    │       └── ...
-    └── D24/
-        └── 20190531_151815/
-            └── ...
-```
-
-### 3. 실행
-
-```bash
-# 전체 처리 (config.py에 정의된 모든 웨이퍼)
+# GPDO + MZM 전체 처리
 python run.py
 
 # GPDO만 처리
 python run.py GPDO
 
-# 특정 디바이스 여러 개 선택
-python run.py GPDO LMZC
+# MZM만 처리 (LMZC / LMZO 모두 포함)
+python run.py MZM
 ```
 
-### 4. 결과 확인
+실행이 완료되면 아래와 같이 결과가 출력됩니다.
 
 ```
-res/
-├── D08-GPDO/
-│   └── 20190526_082853/
-│       ├── png/                                        ← 다이별 6-패널 분석 그래프
-│       │   ├── HY202103_D08_(-1,-1)_LION1_DCM_GPDO.png
-│       │   └── ...
-│       └── heatmap/                                    ← 웨이퍼 히트맵
-│           ├── heatmap_R_resp.png
-│           └── heatmap_n_d.png
-└── csv/
-    ├── D08_Result.csv     ← 웨이퍼별 CSV
-    └── Total_Result.csv   ← 전체 통합 CSV
+============================================================
+  📋 실행 요약
+============================================================
+  ✅ GPDO   / D08  →  res/png/GPDO/HY202103/D08/{timestamp}/
+  ✅ GPDO   / D23  →  res/png/GPDO/HY202103/D23/{timestamp}/
+  ✅ MZM    / D07  →  res/png/MZM/HY202103/D07/{timestamp}/
+  ✅ MZM    / D08  →  res/png/MZM/HY202103/D08/{timestamp}/
+============================================================
 ```
 
 ---
 
-## 출력 그래프 예시
-
-### 다이 단위 6-패널 분석 그래프
-
-```
-┌─────────────────────┬─────────────────────┐
-│ (a) Reference       │ (b) Dark Current     │
-│     Spectrum        │     I–V [Log]        │
-├─────────────────────┼─────────────────────┤
-│ (c) Light Current   │ (d) Photo Current    │
-│     I–V [Log]       │     [Log]            │
-├─────────────────────┼─────────────────────┤
-│ (e) Light Current   │ (f) Responsivity     │
-│     Spectrum        │     R(λ) [A/W]       │
-└─────────────────────┴─────────────────────┘
-```
-
-| 패널 | 내용 |
-|------|------|
-| (a) Reference Spectrum | 12차 다항식 피팅 + 최솟값 마커 |
-| (b) Dark Current I–V | 순방향 Shockley + 역방향 Power-law |
-| (c) Light Current I–V | 광전류 포함 Shockley 피팅 |
-| (d) Photo Current | Light − Dark 차감 결과 |
-| (e) Light Current Spectrum | 파장 스윕 전류 (피크 파장 강조) |
-| (f) R(λ) | 파장별 Responsivity — 편도 IL 보정 적용 |
-
-### 히트맵
-
-웨이퍼 내 다이 위치(col, row)별로 **Responsivity** 와 **이상계수 n** 을 색상으로 표시합니다.
-데이터가 없는 다이는 회색 `N/A` 로 표시됩니다.
-
----
-
-## CSV 컬럼 설명
-
-| 컬럼 | 단위 | 설명 |
-|------|------|------|
-| `wafer_id` | — | 웨이퍼 ID (D07, D08 등) |
-| `timestamp` | — | 측정시간 폴더명 (`YYYYMMDD_HHMMSS`) |
-| `col` / `row` | — | 다이 위치 (X / Y) |
-| `lc_wl` | nm | Light Current 측정 파장 |
-| `peak_wl` | nm | 스펙트럼 피크 파장 |
-| `fiber_dbm` | dBm | 파이버 출력 파워 |
-| `Iph` | A | 광전류 |
-| `n_d` | — | 이상계수 (이상적: 1, 재결합 우세: 2) |
-| `R_resp` | A/W | 응답도 |
-| `r2_fwd` | — | 순방향 Dark Current 피팅 R² |
-| `r2_photo` | — | 역바이어스 광전류 포화 균일도 R² |
-
----
-
-## 프로젝트 구조
+## 📂 5. 파일 구조 (Project Structure)
 
 ```
 project/
-├── run.py                      # 실행 진입점
-├── config.py                   # 경로·웨이퍼·디바이스 설정
-├── data/                       # 원본 XML (Git 미추적)
+├── run.py                        # 실행 진입점 — CLI 인자로 디바이스 타입 선택
+├── config.py                     # 경로 및 디바이스 설정 (웨이퍼·프로젝트 자동 탐색)
+│
+├── data/                         # 원본 XML 측정 파일 (Git 미추적)
+│   └── HY202103/
+│       └── D08/ ...
+│
+├── res/                          # 분석 결과물 (Git 미추적)
+│   ├── png/
+│   │   ├── GPDO/HY202103/D08/{timestamp}/   ← 다이 6-패널 PNG + heatmap/
+│   │   └── MZM/ HY202103/D08/{timestamp}/   ← 다이 6-패널 PNG + heatmap/
+│   └── csv/
+│       ├── GPDO/HY202103/D08_Result.csv
+│       ├── GPDO/HY202103/Total_Result.csv
+│       ├── MZM/ HY202103/D08_Result.csv
+│       └── MZM/ HY202103/Total_Result.csv
+│
 └── src/
-    ├── parser/
-    │   └── gpdo_parser.py      # XML 파싱 (GPDOParser)
-    ├── fitting/
-    │   └── fitting_engine.py   # 피팅 모델 + 연산 (FittingEngine)
-    ├── plotting/
-    │   ├── plotter.py          # 다이 6-패널 PNG (Plotter)
-    │   └── heatmap_plotter.py  # 웨이퍼 히트맵 PNG (HeatmapPlotter)
-    ├── analyzer/
-    │   └── gpdo_analyzer.py    # 전체 파이프라인 통합 (GPDOAnalyzer)
-    └── tocsv/
-        └── gpdo_csv.py         # CSV 저장 (save_results)
+    ├── gpdo/
+    │   ├── analyzer.py           # GPDOAnalyzer — 전체 파이프라인 통합
+    │   ├── parser.py             # GPDOParser — XML 파싱
+    │   ├── fitting.py            # FittingEngine — Shockley / Power-law 피팅
+    │   ├── plotter.py            # Plotter — 다이 6-패널 PNG 생성
+    │   └── csv.py                # 웨이퍼별 CSV 및 Total CSV 저장
+    ├── mzm/
+    │   ├── analyzer.py           # MZMAnalyzer — 전체 파이프라인 통합
+    │   ├── parser.py             # MZMParser — XML 파싱 + 디바이스 타입 감지
+    │   ├── fitting.py            # fit_mzi / process_iv / fit_polynomials
+    │   ├── plotter.py            # Plotter — 다이 6-패널 PNG 생성
+    │   └── csv.py                # 웨이퍼별 CSV 및 Total CSV 저장
+    └── heatmap_plotter.py        # HeatmapPlotter — 웨이퍼 단위 히트맵 생성
 ```
 
 ---
 
-## 설정 변경
+## 🔬 6. 분석 모델 상세 (Analysis Models)
 
-### 웨이퍼 추가 / 제거
+### GPDO IV 피팅
 
-```python
-# config.py
-WAFER_IDS = ["D07", "D08", "D23", "D24"]
+| 구간 | 모델 | 파라미터 |
+|------|------|----------|
+| 순방향 (V > 0.3V) | Shockley 다이오드: `I = Is · exp(V / n·Vt)` | `Is` (포화전류), `n` (이상계수) |
+| 역방향 (V ≤ 0.3V) | 3차 다항식 | 역방향 포화 특성 |
+| 광전류 | `I_photo = I_light − I_dark` | `Iph`, `R = Iph / P_in` |
+
+### MZM MZI 피팅 (고정 -40 dB Floor)
+
+참고 코드를 바탕으로 소광비 floor를 **-40 dB 고정**하는 모델을 적용합니다.  
+자유 파라미터를 줄여 피팅 안정성을 높이고 로컬 미니멈 함정을 방지합니다.
+
+```
+T(λ) = c + d · cos(a·λ + b)
+
+  floor = 10^(-40/10) = 1×10⁻⁴  (고정)
+  c = (t_max + floor) / 2
+  d = (t_max - floor) / 2
+
+자유 파라미터:  a (→ FSR = 2π/a),  b (위상),  t_max (최대 투과율)
 ```
 
-### 프로젝트 데이터셋 변경
+### 측정 데이터 품질 검사
 
-```python
-# config.py
-PROJECT_NAME = "HY202103"   # data/ 바로 아래 폴더명과 일치
+| 조건 | 판정 |
+|------|------|
+| `max(│I│) < 1 nA` | IV 전류가 노이즈 수준 — probe contact 불량 의심 |
+| Forward bias (V > 0.3V) 에서 `I_max / I_min < 10` | 다이오드 특성 없음 — junction 불량 의심 |
+
+오류가 감지된 경우, 6개 분석 패널 위에 `Measurement Data Error` 박스를 **오버레이**해 저장합니다.  
+*(코드 오류가 아닌 측정 데이터 자체의 문제임을 명시)*
+
+---
+
+## 📊 7. CSV 출력 컬럼 (Output Columns)
+
+### GPDO
+
+| 컬럼 | 단위 | 설명 |
+|------|------|------|
+| `wafer_id` | — | 웨이퍼 ID |
+| `timestamp` | — | 측정 타임스탬프 폴더명 |
+| `col` / `row` | — | 다이 위치 (X / Y) |
+| `lc_wl` | nm | Light Current 측정 파장 |
+| `fiber_dbm` | dBm | 파이버 출력 파워 |
+| `Iph` | A | 광전류 |
+| `n_d` | — | 이상계수 |
+| `R_resp` | A/W | 응답도 |
+| `r2_fwd` | — | 순방향 피팅 R² |
+
+### MZM
+
+| 컬럼 | 설명 |
+|------|------|
+| `Lot` / `Wafer` / `Mask` / `Testsite` | 웨이퍼 식별 정보 |
+| `Row` / `Column` | 다이 위치 |
+| `Analysis Wavelength` | 분석 파장 [nm] |
+| `Rsq of Ref. spectrum (Nth)` | Reference 스펙트럼 피팅 R² |
+| `Rsq of IV` | IV 피팅 R² |
+| `I at -1V [A]` / `I at 1V [A]` | 각 전압에서의 전류 |
+| `Ideality Factor` | 다이오드 이상계수 |
+| `Extinction Ratio (dB)` | MZI 소광비 |
+| `FSR (nm)` | Free Spectral Range |
+| `ErrorFlag` / `Error description` | 데이터 품질 플래그 |
+
+---
+
+## ⚙️ 8. 설정 변경 (Configuration)
+
+### 새 프로젝트 / 웨이퍼 추가
+
+`data/` 하위에 폴더를 추가하기만 하면 자동으로 인식됩니다. **`config.py` 수정 불필요.**
+
+```
+data/
+├── HY202103/   ← 기존
+└── HY202104/   ← 폴더 추가만으로 자동 처리
+    └── D07/ ...
 ```
 
-### 특정 디바이스에 다른 웨이퍼 셋 지정
+### 특정 웨이퍼만 처리하도록 제한
 
 ```python
 # config.py
 DEVICE_CONFIG = {
-    "GPDO": dict(
-        wafer_ids = ["D08", "D24"],   # 이 디바이스만 D08·D24 처리
-        save_root = "GPDO",
-    ),
+    "GPDO": dict(wafer_ids=["D08", "D24"]),   # D08, D24만 처리
+    "MZM":  dict(wafer_ids=None),              # None → 전체 처리
 }
 ```
-
 ---
 
-## 새 디바이스 추가 방법
+## ✉️ 9. 연락처 (Contact)
 
-LMZC, LMZO 등 다른 디바이스를 추가할 때:
+문의 및 피드백은 GitHub Issues를 이용해 주세요.
 
-1. `src/analyzer/` 에 새 분석기 클래스 작성 (`GPDOAnalyzer` 참고)
-2. `config.py` → `DEVICE_CONFIG` 에 항목 추가
-3. `run.py` → `RUNNER_REGISTRY` 에 등록
-
-```python
-# run.py
-RUNNER_REGISTRY = {
-    "GPDO": GPDOAnalyzer,
-    "LMZC": LMZCAnalyzer,   # 주석 해제
-}
-```
-
----
-
-## 환경
-
-- Python 3.10 이상
-- 의존 패키지: `numpy` `scipy` `matplotlib` `lxml` `pandas`
+**Project Link:** `https://github.com/H1SKIM/Teamproject-GPDO-/issues`
