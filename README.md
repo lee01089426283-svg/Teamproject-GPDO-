@@ -216,32 +216,32 @@ When an error is detected, a `Measurement Data Error` box is **overlaid** on the
 
 ### GPDO
 
-| Column | Unit | Description |
-|--------|------|-------------|
-| `wafer_id` | — | Wafer ID |
-| `timestamp` | — | Measurement timestamp folder name |
+| Column      | Unit | Description |
+|-------------|------|-------------|
+| `Lot` / `Wafer` / `Mask` / `Testsite`  | — | Wafer identification info |
 | `col` / `row` | — | Die position (X / Y) |
-| `lc_wl` | nm | Light current measurement wavelength |
+| `lc_wl`     | nm | Light current measurement wavelength |
 | `fiber_dbm` | dBm | Fiber output power |
-| `Iph` | A | Photo current |
-| `n_d` | — | Ideality factor |
-| `R_resp` | A/W | Responsivity |
-| `r2_fwd` | — | Forward bias fitting R² |
+| `Iph`       | A | Photo current |
+| `n_d`       | — | Ideality factor |
+| `R_resp`    | A/W | Responsivity |
+| `r2_fwd`    | — | Forward bias fitting R² |
 
 ### MZM
 
-| Column | Description |
-|--------|-------------|
-| `Lot` / `Wafer` / `Mask` / `Testsite` | Wafer identification info |
-| `Row` / `Column` | Die position |
-| `Analysis Wavelength` | Analysis wavelength [nm] |
-| `Rsq of Ref. spectrum (Nth)` | Reference spectrum fitting R² |
-| `Rsq of IV` | IV fitting R² |
-| `I at -1V [A]` / `I at 1V [A]` | Current at each voltage |
-| `Ideality Factor` | Diode ideality factor |
-| `Extinction Ratio (dB)` | MZI extinction ratio |
-| `FSR (nm)` | Free Spectral Range |
-| `ErrorFlag` / `Error description` | Data quality flag |
+| Column                                | Unit | Description |
+|---------------------------------------|------|-------------|
+| `Lot` / `Wafer` / `Mask` / `Testsite` | — | Wafer identification info |
+| `col` / `row`                         | — | Die position |
+| `Analysis Wavelength`                 | nm | Analysis wavelength |
+| `Rsq of Ref. spectrum (Nth)`          | — | Reference spectrum fitting R² |
+| `Rsq of IV`                           | — | IV fitting R² |
+| `I at -1V [A]` / `I at 1V [A]`        | A | Current at each voltage |
+| `Ideality Factor`                     | — | Diode ideality factor |
+| `Extinction Ratio`                    | dB | MZI extinction ratio |
+| `FSR `                                | nm | Free Spectral Range |
+| `ErrorFlag` / `Error description`     | — | Data quality flag |
+
 
 ---
 
