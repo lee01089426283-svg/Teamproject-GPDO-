@@ -44,7 +44,7 @@ DEFAULT_COLOR = '#455A64'
 # 내부 헬퍼
 # ══════════════════════════════════════════════════════════
 
-def _raincloud_ax(ax, data_by_wafer: dict, ylabel: str, title: str) -> None:
+def _raincloud_ax(ax, data_by_wafer: dict, ylabel: str, title: str = '') -> None:
     """
     단일 axes에 Raincloud Plot 그리기.
     data_by_wafer: {'D07': array, 'D08': array, ...}
@@ -53,7 +53,8 @@ def _raincloud_ax(ax, data_by_wafer: dict, ylabel: str, title: str) -> None:
     if not wafers:
         ax.text(0.5, 0.5, 'No data', ha='center', va='center',
                 transform=ax.transAxes, color='gray')
-        ax.set_title(title, fontweight='bold')
+        if title:
+            ax.set_title(title, fontweight='bold')
         return
 
     n = len(wafers)
@@ -100,9 +101,68 @@ def _raincloud_ax(ax, data_by_wafer: dict, ylabel: str, title: str) -> None:
     ax.set_xticks(positions)
     ax.set_xticklabels(wafers)
     ax.set_ylabel(ylabel, fontsize=9)
-    ax.set_title(title, fontweight='bold', fontsize=10)
+    if title:
+        ax.set_title(title, fontweight='bold', fontsize=10)
     ax.grid(axis='y', alpha=0.25)
     ax.set_xlim(-0.6, n - 0.4)
+
+
+def _all_finite_values(data_by_wafer: dict) -> np.ndarray:
+    vals = [
+        np.asarray(v, dtype=float)[np.isfinite(np.asarray(v, dtype=float))]
+        for v in data_by_wafer.values()
+    ]
+    vals = [v for v in vals if len(v)]
+    return np.concatenate(vals) if vals else np.array([])
+
+
+def _padded_limits(vals: np.ndarray, fallback: tuple[float, float]) -> tuple[float, float]:
+    vals = vals[np.isfinite(vals)]
+    if len(vals) == 0:
+        return fallback
+    lo, hi = float(vals.min()), float(vals.max())
+    pad = max((hi - lo) * 0.08, 0.01)
+    return lo - pad, hi + pad
+
+
+def _raincloud_broken_y_fig(data_by_wafer: dict,
+                            ylabel: str,
+                            title: str,
+                            break_range: tuple[float, float],
+                            figsize: tuple[float, float]):
+    """Raincloud plot with a skipped y interval for sparse high-value points."""
+    fig, (ax_top, ax_bottom) = plt.subplots(
+        2, 1, figsize=figsize, sharex=True,
+        gridspec_kw={'height_ratios': [1, 3], 'hspace': 0.05}
+    )
+
+    _raincloud_ax(ax_top, data_by_wafer, '', title)
+    _raincloud_ax(ax_bottom, data_by_wafer, ylabel)
+
+    break_lo, break_hi = break_range
+    all_vals = _all_finite_values(data_by_wafer)
+    low_vals = all_vals[all_vals <= break_lo]
+    high_vals = all_vals[all_vals >= break_hi]
+
+    bottom_lo, _ = _padded_limits(low_vals, (break_lo - 0.2, break_lo))
+    _, top_hi = _padded_limits(high_vals, (break_hi, break_hi + 0.2))
+    ax_bottom.set_ylim(bottom_lo, break_lo)
+    ax_top.set_ylim(break_hi, top_hi)
+
+    ax_top.spines['bottom'].set_visible(False)
+    ax_bottom.spines['top'].set_visible(False)
+    ax_top.tick_params(labelbottom=False, bottom=False)
+    ax_bottom.xaxis.tick_bottom()
+    ax_top.set_xlabel('')
+
+    kwargs = dict(marker=[(-1, -0.5), (1, 0.5)], markersize=10,
+                  linestyle='none', color='k', mec='k', mew=1, clip_on=False)
+    ax_top.plot([0, 1], [0, 0], transform=ax_top.transAxes, **kwargs)
+    ax_bottom.plot([0, 1], [1, 1], transform=ax_bottom.transAxes, **kwargs)
+    ax_bottom.text(1.01, 1.02, '~~', transform=ax_bottom.transAxes,
+                   ha='left', va='bottom', fontsize=12, fontweight='bold')
+
+    return fig, (ax_top, ax_bottom)
 
 
 # ══════════════════════════════════════════════════════════
@@ -158,6 +218,12 @@ def generate_boxplots(project_name: str,
     # ── MZM (LMZC / LMZO 분리) ────────────────────────
     if os.path.isfile(mzm_csv):
         mdf = pd.read_csv(mzm_csv)
+        if 'ErrorFlag' in mdf.columns:
+            before = len(mdf)
+            mdf = mdf[pd.to_numeric(mdf['ErrorFlag'], errors='coerce').fillna(0) == 0].copy()
+            excluded = before - len(mdf)
+            if excluded:
+                print(f'       [Boxplot] MZM ErrorFlag 행 제외: {excluded}개')
 
         for dtype_key, dtype_label in [('DCM_LMZC', 'LMZC'), ('DCM_LMZO', 'LMZO')]:
             sub_df = mdf[mdf['Testsite'] == dtype_key] if 'Testsite' in mdf.columns else mdf
@@ -183,9 +249,18 @@ def generate_boxplots(project_name: str,
                 if not data_by_wafer:
                     continue
 
-                fig, ax = plt.subplots(figsize=(max(4, len(data_by_wafer) * 1.8), 5))
-                _raincloud_ax(ax, data_by_wafer, ylabel,
-                              f'{dtype_label} — {ylabel}  [{project_name}]')
+                figsize = (max(4, len(data_by_wafer) * 1.8), 5)
+                title = f'{dtype_label} — {ylabel}  [{project_name}]'
+                if dtype_label == 'LMZO' and col == 'Ideality Factor':
+                    fig, _ = _raincloud_broken_y_fig(
+                        data_by_wafer, ylabel, title,
+                        break_range=(1.55, 2.15),
+                        figsize=figsize,
+                    )
+                else:
+                    fig, ax = plt.subplots(figsize=figsize)
+                    _raincloud_ax(ax, data_by_wafer, ylabel, title)
+
                 plt.tight_layout()
                 fpath = os.path.join(out_dir, f'{stem}.png')
                 fig.savefig(fpath, dpi=150, bbox_inches='tight')
