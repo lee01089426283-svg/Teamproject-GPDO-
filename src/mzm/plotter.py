@@ -117,8 +117,6 @@ class Plotter:
         else:
             title = stem
 
-        if has_error:
-            title += '\n[!] Measurement Data Error  (Not a code error)'
         fig.suptitle(title, fontsize=11, fontweight='bold')
 
         # 6개 패널 항상 그리기
@@ -129,25 +127,23 @@ class Plotter:
         cls._panel_iv_raw(              axes[1, 1], root)
         cls._panel_iv_fitting(          axes[1, 2], root)
 
+        top = 0.92 if extra_info else 0.96
         if has_error:
-            # 6개 패널 위에 에러 박스 오버레이
-            error_ax = fig.add_axes([0, 0, 1, 1])
-            error_ax.axis('off')
-            error_ax.patch.set_alpha(0)
-            error_text = '\n'.join(f'- {e}' for e in iv_errors['errors'])
-            error_ax.text(0.5, 0.5,
-                          f'Measurement Data Error\n\n{error_text}',
-                          ha='center', va='center', fontsize=16,
-                          color='red', fontweight='bold',
-                          transform=error_ax.transAxes,
-                          bbox=dict(boxstyle='round,pad=1.2',
-                                    facecolor='lightyellow', edgecolor='red',
-                                    linewidth=3, alpha=0.92))
-
-        top = 0.92 if (extra_info or has_error) else 0.96
+            top = 0.84   # 에러 박스 공간 확보
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', message='.*tight_layout.*')
             plt.tight_layout(rect=[0, 0, 1, top])
+
+        if has_error:
+            error_text = '  |  '.join(iv_errors['errors'])
+            fig.text(0.5, top + (1 - top) * 0.18,
+                     f'⚠  {error_text}',
+                     ha='center', va='center',
+                     fontsize=9.5, color='red', fontweight='bold',
+                     transform=fig.transFigure,
+                     bbox=dict(boxstyle='round,pad=0.5',
+                               facecolor='lightyellow', edgecolor='red',
+                               linewidth=1.8, alpha=0.95))
 
         out_path = ''
         if save_dir:

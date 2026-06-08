@@ -95,24 +95,20 @@ class Plotter:
         cls._panel_spec(   axes[2,0], raw)
         cls._panel_rlambda(axes[2,1], raw, R_lambda)
 
-        # ── 측정 데이터 오류 오버레이 ─────────────────
+        # ── 측정 데이터 오류 — 제목 영역에 표시 ─────────
         if error_messages:
-            fig.suptitle(
-                f"{stem}\n[!] Measurement Data Error  (Not a code error)",
-                fontsize=12, fontweight="bold",
-            )
-            error_ax = fig.add_axes([0, 0, 1, 1])
-            error_ax.axis('off')
-            error_ax.patch.set_alpha(0)
-            error_text = '\n'.join(f'- {e}' for e in error_messages)
-            error_ax.text(0.5, 0.5,
-                          f'Measurement Data Error\n\n{error_text}',
-                          ha='center', va='center', fontsize=16,
-                          color='red', fontweight='bold',
-                          transform=error_ax.transAxes,
-                          bbox=dict(boxstyle='round,pad=1.2',
-                                    facecolor='lightyellow',
-                                    edgecolor='red', linewidth=3, alpha=0.92))
+            plt.tight_layout(rect=[0, 0, 1, 0.84])
+            error_text = '  |  '.join(error_messages)
+            fig.text(0.5, 0.87,
+                     f'⚠  {error_text}',
+                     ha='center', va='center',
+                     fontsize=9.5, color='red', fontweight='bold',
+                     transform=fig.transFigure,
+                     bbox=dict(boxstyle='round,pad=0.5',
+                               facecolor='lightyellow', edgecolor='red',
+                               linewidth=1.8, alpha=0.95))
+        else:
+            plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         # ── 저장 ──────────────────────────────────────
         if save_dir:
