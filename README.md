@@ -77,8 +77,8 @@ A key feature is the automatic detection of measurement data quality issues (e.g
 1. Clone the repository
 
    ```bash
-   git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git
-   cd YOUR_REPO
+   git clone https://github.com/H1SKIM/Teamproject-GPDO-.git
+   cd Teamproject-GPDO-
    ```
 
 2. Install required packages
@@ -272,4 +272,4 @@ DEVICE_CONFIG = {
 
 For questions or feedback, please use GitHub Issues.
 
-**Project Link:** `https://github.com/H1SKIM/Teamproject-GPDO-/issues`
+**Project Link:** [https://github.com/H1SKIM/Teamproject-GPDO-](https://github.com/H1SKIM/Teamproject-GPDO-)

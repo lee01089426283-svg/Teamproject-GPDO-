@@ -1,4 +1,5 @@
 import os
+import warnings
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -144,7 +145,9 @@ class Plotter:
                                     linewidth=3, alpha=0.92))
 
         top = 0.92 if (extra_info or has_error) else 0.96
-        plt.tight_layout(rect=[0, 0, 1, top])
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='.*tight_layout.*')
+            plt.tight_layout(rect=[0, 0, 1, top])
 
         out_path = ''
         if save_dir:
