@@ -18,6 +18,7 @@ from src.gpdo import GPDOAnalyzer
 from src.mzm import MZMAnalyzer
 from src.gpdo.csv import save_results, save_total_csv as gpdo_save_total
 from src.mzm.csv import generate_total_csv as mzm_save_total
+from src.boxplot import generate_boxplots
 
 RUNNER_REGISTRY: dict[str, type] = {
     "GPDO": GPDOAnalyzer,
@@ -115,6 +116,15 @@ def main(targets: list[str] | None = None) -> dict[str, dict[str, list]]:
         gpdo_save_total(gpdo_csv_dir)
     if "MZM" in targets:
         mzm_save_total(verbose=True)
+
+    # Boxplot (Raincloud) — CSV 생성 후 한 번만
+    print(f"\n{'='*60}")
+    print("  📊 Boxplot (Raincloud) 생성 중...")
+    print(f"{'='*60}")
+    gpdo_total = os.path.join(RES_DIR, "csv", "GPDO", project_name, "Total_Result.csv")
+    mzm_total  = os.path.join(RES_DIR, "csv", "MZM",  project_name, "Total_Result.csv")
+    bp_out_dir = os.path.join(RES_DIR, "png", "boxplot", project_name)
+    generate_boxplots(project_name, gpdo_total, mzm_total, bp_out_dir)
 
     print(f"\n{'='*60}")
     print("  📋 실행 요약")
