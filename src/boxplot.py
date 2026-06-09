@@ -130,39 +130,60 @@ def _raincloud_broken_y_fig(data_by_wafer: dict,
                             title: str,
                             break_range: tuple[float, float],
                             figsize: tuple[float, float]):
-    """Raincloud plot with a skipped y interval for sparse high-value points."""
-    fig, (ax_top, ax_bottom) = plt.subplots(
-        2, 1, figsize=figsize, sharex=True,
-        gridspec_kw={'height_ratios': [1, 3], 'hspace': 0.05}
-    )
-
-    _raincloud_ax(ax_top, data_by_wafer, '', title)
-    _raincloud_ax(ax_bottom, data_by_wafer, ylabel)
-
+    """Raincloud plot with an in-axis compressed y interval."""
+    fig, ax = plt.subplots(figsize=figsize)
     break_lo, break_hi = break_range
+    gap = break_hi - break_lo
+    visible_gap = 0.045
+
+    def compress_y(vals):
+        scalar_input = np.isscalar(vals)
+        vals = np.asarray(vals, dtype=float)
+        compressed = np.where(vals >= break_hi, vals - gap + visible_gap, vals)
+        return float(compressed) if scalar_input else compressed
+
     all_vals = _all_finite_values(data_by_wafer)
     low_vals = all_vals[all_vals <= break_lo]
     high_vals = all_vals[all_vals >= break_hi]
+    low_data_by_wafer = {
+        w: np.asarray(v, dtype=float)[np.asarray(v, dtype=float) <= break_lo]
+        for w, v in data_by_wafer.items()
+    }
+
+    _raincloud_ax(ax, low_data_by_wafer, ylabel, title)
+
+    wafers = [w for w, v in data_by_wafer.items() if len(v) >= 2]
+    rng = np.random.default_rng(42)
+    for i, wafer in enumerate(wafers):
+        vals = np.asarray(data_by_wafer[wafer], dtype=float)
+        vals = vals[np.isfinite(vals) & (vals >= break_hi)]
+        if len(vals) == 0:
+            continue
+        jitter = rng.uniform(-0.08, 0.08, size=len(vals))
+        color = PALETTE.get(wafer, DEFAULT_COLOR)
+        ax.scatter(i + 0.25 + jitter, compress_y(vals),
+                   color=color, s=18, alpha=0.65,
+                   edgecolors='none', zorder=3)
 
     bottom_lo, _ = _padded_limits(low_vals, (break_lo - 0.2, break_lo))
-    _, top_hi = _padded_limits(high_vals, (break_hi, break_hi + 0.2))
-    ax_bottom.set_ylim(bottom_lo, break_lo)
-    ax_top.set_ylim(break_hi, top_hi)
+    _, high_top = _padded_limits(high_vals, (break_hi, break_hi + 0.2))
+    ax.set_ylim(bottom_lo, compress_y(high_top))
 
-    ax_top.spines['bottom'].set_visible(False)
-    ax_bottom.spines['top'].set_visible(False)
-    ax_top.tick_params(labelbottom=False, bottom=False)
-    ax_bottom.xaxis.tick_bottom()
-    ax_top.set_xlabel('')
+    low_ticks = [1.30, 1.35, 1.40, 1.45, 1.50, 1.55]
+    high_ticks = [2.15, 2.20]
+    ticks = low_ticks + [compress_y(t) for t in high_ticks]
+    labels = [f'{t:.2f}' for t in low_ticks + high_ticks]
+    ax.set_yticks(ticks)
+    ax.set_yticklabels(labels)
 
-    kwargs = dict(marker=[(-1, -0.5), (1, 0.5)], markersize=10,
-                  linestyle='none', color='k', mec='k', mew=1, clip_on=False)
-    ax_top.plot([0, 1], [0, 0], transform=ax_top.transAxes, **kwargs)
-    ax_bottom.plot([0, 1], [1, 1], transform=ax_bottom.transAxes, **kwargs)
-    ax_bottom.text(1.01, 1.02, '~~', transform=ax_bottom.transAxes,
-                   ha='left', va='bottom', fontsize=12, fontweight='bold')
+    break_y = break_lo + visible_gap / 2
+    x_wave = np.linspace(-0.018, 0.018, 80)
+    y_wave = break_y + 0.008 * np.sin(np.linspace(0, 2 * np.pi, len(x_wave)))
+    for x0 in (0, 1):
+        ax.plot(x0 + x_wave, y_wave, transform=ax.get_yaxis_transform(),
+                color='black', lw=1.2, clip_on=False)
 
-    return fig, (ax_top, ax_bottom)
+    return fig, ax
 
 
 # ══════════════════════════════════════════════════════════
