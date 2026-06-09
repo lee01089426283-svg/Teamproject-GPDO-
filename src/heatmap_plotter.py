@@ -46,7 +46,9 @@ class HeatmapPlotter:
              wafer_id: str = "D08",
              save_dir: str = None,
              file_stem: str = None) -> None:  # ← 추가
-        ...
+        cols = [r['col'] for r in results]
+        rows = [r['row'] for r in results]
+        vals = [r.get(param_key, np.nan) for r in results]
         HeatmapPlotter._draw_and_save(
             cols=cols, rows=rows, vals=vals,
             param_key=file_stem or param_key,  # ← 변경
@@ -212,7 +214,7 @@ class HeatmapPlotter:
 
         if save_dir:
             os.makedirs(save_dir, exist_ok=True)
-            fpath = os.path.join(save_dir, f"heatmap_{param_key}.png")
+            fpath = os.path.join(save_dir, f"{param_key}.png")
             fig.savefig(fpath, dpi=150, bbox_inches="tight")
             print(f"       저장: {fpath}")
         plt.close(fig)
