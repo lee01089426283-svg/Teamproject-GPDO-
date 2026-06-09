@@ -193,18 +193,11 @@ def _raincloud_broken_y_fig(data_by_wafer: dict,
 def generate_boxplots(project_name: str,
                       gpdo_csv: str,
                       mzm_csv: str,
-                      out_dir: str) -> list[str]:
-    """
-    GPDO / LMZC / LMZO 그룹별 Raincloud Plot을 생성하고 PNG 경로 목록을 반환.
-
-    Parameters
-    ----------
-    project_name : str          예) 'HY202103'
-    gpdo_csv     : str          GPDO Total_Result.csv 경로
-    mzm_csv      : str          MZM  Total_Result.csv 경로
-    out_dir      : str          PNG 저장 폴더
-    """
-    os.makedirs(out_dir, exist_ok=True)
+                      gpdo_out_dir: str,
+                      mzm_out_dir: str) -> list[str]:
+    ...
+    os.makedirs(gpdo_out_dir, exist_ok=True)
+    os.makedirs(mzm_out_dir,  exist_ok=True)
     saved = []
 
     # ── GPDO ──────────────────────────────────────────
@@ -228,7 +221,7 @@ def generate_boxplots(project_name: str,
             _raincloud_ax(ax, data_by_wafer, ylabel,
                           f'GPDO — {ylabel}  [{project_name}]')
             plt.tight_layout()
-            fpath = os.path.join(out_dir, f'{stem}.png')
+            fpath = os.path.join(gpdo_out_dir, f'{stem}.png')
             fig.savefig(fpath, dpi=150, bbox_inches='tight')
             plt.close(fig)
             saved.append(fpath)
@@ -283,7 +276,7 @@ def generate_boxplots(project_name: str,
                     _raincloud_ax(ax, data_by_wafer, ylabel, title)
 
                 plt.tight_layout()
-                fpath = os.path.join(out_dir, f'{stem}.png')
+                fpath = os.path.join(mzm_out_dir, f'{stem}.png')
                 fig.savefig(fpath, dpi=150, bbox_inches='tight')
                 plt.close(fig)
                 saved.append(fpath)
