@@ -44,7 +44,7 @@ DEFAULT_COLOR = '#455A64'
 # 내부 헬퍼
 # ══════════════════════════════════════════════════════════
 
-def _raincloud_ax(ax, data_by_wafer: dict, ylabel: str, title: str) -> None:
+def _raincloud_ax(ax, data_by_wafer: dict, ylabel: str, title: str = '') -> None:
     """
     단일 axes에 Raincloud Plot 그리기.
     data_by_wafer: {'D07': array, 'D08': array, ...}
@@ -53,7 +53,8 @@ def _raincloud_ax(ax, data_by_wafer: dict, ylabel: str, title: str) -> None:
     if not wafers:
         ax.text(0.5, 0.5, 'No data', ha='center', va='center',
                 transform=ax.transAxes, color='gray')
-        ax.set_title(title, fontweight='bold')
+        if title:
+            ax.set_title(title, fontweight='bold')
         return
 
     n = len(wafers)
@@ -100,9 +101,89 @@ def _raincloud_ax(ax, data_by_wafer: dict, ylabel: str, title: str) -> None:
     ax.set_xticks(positions)
     ax.set_xticklabels(wafers)
     ax.set_ylabel(ylabel, fontsize=9)
-    ax.set_title(title, fontweight='bold', fontsize=10)
+    if title:
+        ax.set_title(title, fontweight='bold', fontsize=10)
     ax.grid(axis='y', alpha=0.25)
     ax.set_xlim(-0.6, n - 0.4)
+
+
+def _all_finite_values(data_by_wafer: dict) -> np.ndarray:
+    vals = [
+        np.asarray(v, dtype=float)[np.isfinite(np.asarray(v, dtype=float))]
+        for v in data_by_wafer.values()
+    ]
+    vals = [v for v in vals if len(v)]
+    return np.concatenate(vals) if vals else np.array([])
+
+
+def _padded_limits(vals: np.ndarray, fallback: tuple[float, float]) -> tuple[float, float]:
+    vals = vals[np.isfinite(vals)]
+    if len(vals) == 0:
+        return fallback
+    lo, hi = float(vals.min()), float(vals.max())
+    pad = max((hi - lo) * 0.08, 0.01)
+    return lo - pad, hi + pad
+
+
+def _raincloud_broken_y_fig(data_by_wafer: dict,
+                            ylabel: str,
+                            title: str,
+                            break_range: tuple[float, float],
+                            figsize: tuple[float, float]):
+    """Raincloud plot with an in-axis compressed y interval."""
+    fig, ax = plt.subplots(figsize=figsize)
+    break_lo, break_hi = break_range
+    gap = break_hi - break_lo
+    visible_gap = 0.045
+
+    def compress_y(vals):
+        scalar_input = np.isscalar(vals)
+        vals = np.asarray(vals, dtype=float)
+        compressed = np.where(vals >= break_hi, vals - gap + visible_gap, vals)
+        return float(compressed) if scalar_input else compressed
+
+    all_vals = _all_finite_values(data_by_wafer)
+    low_vals = all_vals[all_vals <= break_lo]
+    high_vals = all_vals[all_vals >= break_hi]
+    low_data_by_wafer = {
+        w: np.asarray(v, dtype=float)[np.asarray(v, dtype=float) <= break_lo]
+        for w, v in data_by_wafer.items()
+    }
+
+    _raincloud_ax(ax, low_data_by_wafer, ylabel, title)
+
+    wafers = [w for w, v in data_by_wafer.items() if len(v) >= 2]
+    rng = np.random.default_rng(42)
+    for i, wafer in enumerate(wafers):
+        vals = np.asarray(data_by_wafer[wafer], dtype=float)
+        vals = vals[np.isfinite(vals) & (vals >= break_hi)]
+        if len(vals) == 0:
+            continue
+        jitter = rng.uniform(-0.08, 0.08, size=len(vals))
+        color = PALETTE.get(wafer, DEFAULT_COLOR)
+        ax.scatter(i + 0.25 + jitter, compress_y(vals),
+                   color=color, s=18, alpha=0.65,
+                   edgecolors='none', zorder=3)
+
+    bottom_lo, _ = _padded_limits(low_vals, (break_lo - 0.2, break_lo))
+    _, high_top = _padded_limits(high_vals, (break_hi, break_hi + 0.2))
+    ax.set_ylim(bottom_lo, compress_y(high_top))
+
+    low_ticks = [1.30, 1.35, 1.40, 1.45, 1.50, 1.55]
+    high_ticks = [2.15, 2.20]
+    ticks = low_ticks + [compress_y(t) for t in high_ticks]
+    labels = [f'{t:.2f}' for t in low_ticks + high_ticks]
+    ax.set_yticks(ticks)
+    ax.set_yticklabels(labels)
+
+    break_y = break_lo + visible_gap / 2
+    x_wave = np.linspace(-0.018, 0.018, 80)
+    y_wave = break_y + 0.008 * np.sin(np.linspace(0, 2 * np.pi, len(x_wave)))
+    for x0 in (0, 1):
+        ax.plot(x0 + x_wave, y_wave, transform=ax.get_yaxis_transform(),
+                color='black', lw=1.2, clip_on=False)
+
+    return fig, ax
 
 
 # ══════════════════════════════════════════════════════════
@@ -158,6 +239,12 @@ def generate_boxplots(project_name: str,
     # ── MZM (LMZC / LMZO 분리) ────────────────────────
     if os.path.isfile(mzm_csv):
         mdf = pd.read_csv(mzm_csv)
+        if 'ErrorFlag' in mdf.columns:
+            before = len(mdf)
+            mdf = mdf[pd.to_numeric(mdf['ErrorFlag'], errors='coerce').fillna(0) == 0].copy()
+            excluded = before - len(mdf)
+            if excluded:
+                print(f'       [Boxplot] MZM ErrorFlag 행 제외: {excluded}개')
 
         for dtype_key, dtype_label in [('DCM_LMZC', 'LMZC'), ('DCM_LMZO', 'LMZO')]:
             sub_df = mdf[mdf['Testsite'] == dtype_key] if 'Testsite' in mdf.columns else mdf
@@ -183,9 +270,18 @@ def generate_boxplots(project_name: str,
                 if not data_by_wafer:
                     continue
 
-                fig, ax = plt.subplots(figsize=(max(4, len(data_by_wafer) * 1.8), 5))
-                _raincloud_ax(ax, data_by_wafer, ylabel,
-                              f'{dtype_label} — {ylabel}  [{project_name}]')
+                figsize = (max(4, len(data_by_wafer) * 1.8), 5)
+                title = f'{dtype_label} — {ylabel}  [{project_name}]'
+                if dtype_label == 'LMZO' and col == 'Ideality Factor':
+                    fig, _ = _raincloud_broken_y_fig(
+                        data_by_wafer, ylabel, title,
+                        break_range=(1.55, 2.15),
+                        figsize=figsize,
+                    )
+                else:
+                    fig, ax = plt.subplots(figsize=figsize)
+                    _raincloud_ax(ax, data_by_wafer, ylabel, title)
+
                 plt.tight_layout()
                 fpath = os.path.join(out_dir, f'{stem}.png')
                 fig.savefig(fpath, dpi=150, bbox_inches='tight')
