@@ -144,5 +144,5 @@ def main(targets: list[str] | None = None) -> dict[str, dict[str, list]]:
 
 
 if __name__ == "__main__":
-    cli_targets = sys.argv[1:] if len(sys.argv) > 1 else None
+    cli_targets = [t.upper() for t in sys.argv[1:]] if len(sys.argv) > 1 else None
     main(cli_targets)
