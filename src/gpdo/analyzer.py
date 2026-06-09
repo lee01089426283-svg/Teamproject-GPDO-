@@ -43,8 +43,8 @@ class GPDOAnalyzer:
 
     # 히트맵으로 그릴 파라미터 목록 (responsivity, ideality factor만 표시)
     HEATMAP_PARAMS = [
-        ("R_resp", "Responsivity",    "A/W", "RdYlGn"),
-        ("n_d",    "Ideality Factor", "",    "coolwarm"),
+        ("R_resp", "Responsivity", "A/W", "RdYlGn", "heatmap_Responsivity"),
+        ("n_d", "Ideality Factor", "", "coolwarm", "heatmap_Ideality_Factor"),
     ]
 
     def __init__(self, data_dir: str, wafer_id: str):
@@ -226,13 +226,14 @@ class GPDOAnalyzer:
 
     def _plot_heatmaps(self, results: list, save_dir: str) -> None:
         """타임스탬프별 히트맵 일괄 생성."""
-        for key, title, unit, cmap in self.HEATMAP_PARAMS:
+        for key, title, unit, cmap, file_stem in self.HEATMAP_PARAMS:
             try:
                 HeatmapPlotter.plot(
                     results, param_key=key, title=title,
                     unit=unit, cmap=cmap,
                     wafer_id=self.wafer_id,
                     save_dir=save_dir,
+                    file_stem=file_stem,
                 )
             except Exception as e:
                 print(f"       ⚠ 히트맵 실패 [{key}]: {e}")
