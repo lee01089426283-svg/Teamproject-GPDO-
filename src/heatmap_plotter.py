@@ -31,10 +31,11 @@ class HeatmapPlotter:
     """
 
     MZM_HEATMAP_PARAMS = [
-        ("Max transmission of Ref. spec (dB)", "Max Transmission of Ref. Spec", "dB", "RdYlGn"),
-        ("I at -1V [A]",                        "I at -1V",                      "A",  "RdYlBu"),
-        ("Extinction Ratio (dB)",               "Extinction Ratio",              "dB", "RdYlGn"),
-        ("FSR (nm)",                            "FSR",                           "nm", "RdYlBu"),
+        ("Max transmission of Ref. spec (dB)", "Max Transmission of Ref. Spec", "dB", "RdYlGn",
+         "heatmap_Max_Transmission"),
+        ("I at -1V [A]", "I at -1V", "A", "RdYlBu", "heatmap_I_at_-1V"),
+        ("Extinction Ratio (dB)", "Extinction Ratio", "dB", "RdYlGn", "heatmap_Extinction_Ratio"),
+        ("FSR (nm)", "FSR", "nm", "RdYlBu", "heatmap_FSR"),
     ]
 
     # ── GPDO 진입점 ───────────────────────────────────────
@@ -43,14 +44,15 @@ class HeatmapPlotter:
     def plot(results: list, param_key: str, title: str,
              unit: str, cmap: str = "RdYlGn",
              wafer_id: str = "D08",
-             save_dir: str = None) -> None:
+             save_dir: str = None,
+             file_stem: str = None) -> None:  # ← 추가
         cols = [r['col'] for r in results]
         rows = [r['row'] for r in results]
         vals = [r.get(param_key, np.nan) for r in results]
-
         HeatmapPlotter._draw_and_save(
             cols=cols, rows=rows, vals=vals,
-            param_key=param_key, title=title, unit=unit, cmap=cmap,
+            param_key=file_stem or param_key,  # ← 변경
+            title=title, unit=unit, cmap=cmap,
             wafer_id=wafer_id, save_dir=save_dir,
         )
 
@@ -60,7 +62,7 @@ class HeatmapPlotter:
     def plot_mzm_all_from_rows(cls, rows: list,
                                 wafer_id: str = "",
                                 save_dir: str = None) -> None:
-        for param_key, title, unit, cmap in cls.MZM_HEATMAP_PARAMS:
+        for param_key, title, unit, cmap, file_stem in cls.MZM_HEATMAP_PARAMS:
             try:
                 cols = [r.get('Column') for r in rows]
                 _rows = [r.get('Row') for r in rows]
@@ -72,14 +74,9 @@ class HeatmapPlotter:
                     except (TypeError, ValueError):
                         vals.append(np.nan)
 
-                safe_key = (param_key.replace(' ', '_')
-                                     .replace('/', '_')
-                                     .replace('.', '')
-                                     .replace('[', '')
-                                     .replace(']', ''))
                 cls._draw_and_save(
                     cols=cols, rows=_rows, vals=vals,
-                    param_key=safe_key, title=title, unit=unit, cmap=cmap,
+                    param_key=file_stem, title=title, unit=unit, cmap=cmap,
                     wafer_id=wafer_id, save_dir=save_dir,
                 )
             except Exception as e:
@@ -217,7 +214,7 @@ class HeatmapPlotter:
 
         if save_dir:
             os.makedirs(save_dir, exist_ok=True)
-            fpath = os.path.join(save_dir, f"heatmap_{param_key}.png")
+            fpath = os.path.join(save_dir, f"{param_key}.png")
             fig.savefig(fpath, dpi=150, bbox_inches="tight")
             print(f"       저장: {fpath}")
         plt.close(fig)

@@ -123,8 +123,9 @@ def main(targets: list[str] | None = None) -> dict[str, dict[str, list]]:
     print(f"{'='*60}")
     gpdo_total = os.path.join(RES_DIR, "csv", "GPDO", project_name, "Total_Result.csv")
     mzm_total  = os.path.join(RES_DIR, "csv", "MZM",  project_name, "Total_Result.csv")
-    bp_out_dir = os.path.join(RES_DIR, "png", "boxplot", project_name)
-    generate_boxplots(project_name, gpdo_total, mzm_total, bp_out_dir)
+    gpdo_bp_dir = os.path.join(RES_DIR, "png", "GPDO", project_name, "Total")
+    mzm_bp_dir = os.path.join(RES_DIR, "png", "MZM", project_name, "Total")
+    generate_boxplots(project_name, gpdo_total, mzm_total, gpdo_bp_dir, mzm_bp_dir)
 
     print(f"\n{'='*60}")
     print("  📋 실행 요약")
@@ -143,5 +144,5 @@ def main(targets: list[str] | None = None) -> dict[str, dict[str, list]]:
 
 
 if __name__ == "__main__":
-    cli_targets = sys.argv[1:] if len(sys.argv) > 1 else None
+    cli_targets = [t.upper() for t in sys.argv[1:]] if len(sys.argv) > 1 else None
     main(cli_targets)
