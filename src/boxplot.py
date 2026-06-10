@@ -91,12 +91,7 @@ def _raincloud_ax(ax, data_by_wafer: dict, ylabel: str, title: str = '') -> None
         except Exception:
             pass
 
-        # ── 스트립 플롯 (오른쪽 jitter) ──
-        rng = np.random.default_rng(42)
-        jitter = rng.uniform(-0.08, 0.08, size=len(vals))
-        ax.scatter(i + 0.25 + jitter, vals,
-                   color=color, s=12, alpha=0.55,
-                   edgecolors='none', zorder=3)
+        # 스트립 플롯 제거 (KDE + 박스플롯만 표시)
 
     ax.set_xticks(positions)
     ax.set_xticklabels(wafers)
@@ -152,18 +147,7 @@ def _raincloud_broken_y_fig(data_by_wafer: dict,
 
     _raincloud_ax(ax, low_data_by_wafer, ylabel, title)
 
-    wafers = [w for w, v in data_by_wafer.items() if len(v) >= 2]
-    rng = np.random.default_rng(42)
-    for i, wafer in enumerate(wafers):
-        vals = np.asarray(data_by_wafer[wafer], dtype=float)
-        vals = vals[np.isfinite(vals) & (vals >= break_hi)]
-        if len(vals) == 0:
-            continue
-        jitter = rng.uniform(-0.08, 0.08, size=len(vals))
-        color = PALETTE.get(wafer, DEFAULT_COLOR)
-        ax.scatter(i + 0.25 + jitter, compress_y(vals),
-                   color=color, s=18, alpha=0.65,
-                   edgecolors='none', zorder=3)
+    # 스트립 플롯 제거 (KDE + 박스플롯만 표시)
 
     bottom_lo, _ = _padded_limits(low_vals, (break_lo - 0.2, break_lo))
     _, high_top = _padded_limits(high_vals, (break_hi, break_hi + 0.2))

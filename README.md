@@ -178,37 +178,80 @@ project/
 
 ## 🔬 6. Analysis Models
 
-### GPDO IV Fitting
+### GPDO — Parameter Extraction
 
-| Region | Model | Parameters |
-|--------|-------|------------|
-| Forward bias (V > 0.3V) | Shockley diode: `I = Is · exp(V / n·Vt)` | `Is` (saturation current), `n` (ideality factor) |
-| Reverse bias (V ≤ 0.3V) | 3rd-order polynomial | Reverse saturation characteristics |
-| Photo current | `I_photo = I_light − I_dark` | `Iph`, `R = Iph / P_in` |
+#### (1) Ideality Factor `n` and Saturation Current `Is`
 
-### MZM MZI Fitting (Fixed -40 dB Floor)
+Extracted by fitting the **Shockley diode equation** to forward-bias IV data (V > 0.3 V):
 
-The extinction ratio floor is fixed at **-40 dB**, reducing free parameters to improve fitting stability and avoid local minima.
+```
+I = Is · exp(V / n·Vt)
+
+  Vt = kT/q ≈ 0.02585 V  (thermal voltage at 300 K)
+  Is : reverse saturation current  [A]
+  n  : ideality factor  (ideal diode = 1, recombination-dominant = 2)
+```
+
+`Is` and `n` are determined via `scipy.optimize.curve_fit`. Reverse-bias region (V ≤ 0.3 V) is fitted separately with a 3rd-order polynomial to characterize leakage characteristics.
+
+#### (2) Photo Current `Iph` and Responsivity `R`
+
+```
+I_photo(V) = I_light(V) − I_dark(V)
+Iph        = I_photo at measurement bias (typically −1 V)
+
+P_in [W]   = 10^((fiber_dBm + IL_ref(λ) / 2 − 30) / 10)
+R [A/W]    = Iph / P_in
+```
+
+`I_photo` is the element-wise difference between the light-on and dark current sweeps. The optical power `P_in` is back-calculated from the fiber output power and the reference spectrum insertion loss at the measurement wavelength. Because `I_photo` can cross zero (sign flip between light and dark) near the flat region of the IV curve, the photo-current graph shows an abrupt dip at the sign-change point — this is expected behavior, not a measurement error.
+
+---
+
+### MZM — Parameter Extraction
+
+#### (3) Extinction Ratio `ER` and Free Spectral Range `FSR`
+
+Extracted by fitting the **fixed -40 dB floor MZI transmission model**:
 
 ```
 T(λ) = c + d · cos(a·λ + b)
 
-  floor = 10^(-40/10) = 1×10⁻⁴  (fixed)
-  c = (t_max + floor) / 2
-  d = (t_max - floor) / 2
+  floor  = 10^(−40/10) = 1×10⁻⁴   (fixed — avoids local minima)
+  c      = (t_max + floor) / 2
+  d      = (t_max - floor) / 2
 
-Free parameters:  a (→ FSR = 2π/a),  b (phase),  t_max (peak transmission)
+Free parameters:
+  a      → FSR = 2π / a  [nm]
+  b      → phase offset
+  t_max  → peak normalized transmission
+
+ER [dB] = 10 · log10(t_max / floor)
 ```
+
+Fixing the floor at −40 dB reduces free parameters from 4 to 3, preventing the optimizer from finding physically unrealistic solutions. The FSR initial guess is derived from the spacing between transmission dips detected by `scipy.signal.argrelmin`.
+
+#### (4) MZM IV Parameters (`I at −1V`, `Ideality Factor`)
+
+Same Shockley fitting as GPDO. Reverse-bias current `I at −1V` is read directly from the measured IV sweep at V = −1 V.
+
+---
 
 ### Measurement Data Quality Check
 
-| Condition | Judgment |
-|-----------|----------|
-| `max(│I│) < 1 nA` | Current at noise level — suspected probe contact failure |
-| `I_max / I_min < 10` at forward bias (V > 0.3V) | No diode characteristic — suspected junction failure |
+Initial analysis assumed all data to be valid. However, cases were found where the **ideality factor exceeded 3**, which is physically unreasonable for a silicon diode. Investigation revealed two distinct failure modes in the raw measurement data:
 
-When an error is detected, a `Measurement Data Error` box is **overlaid** on the 6 analysis panels and saved to the PNG.
-*(Explicitly indicates a measurement data issue, not a code error)*
+| Error Type | Condition | Root Cause |
+|------------|-----------|------------|
+| **Noise-level current** | `max(│I│) < 1 nA` | Probe contact failure — no current flows into the device |
+| **No diode characteristic** | `I_max / I_min < 10` at V > 0.3V | Junction failure — forward current does not increase exponentially |
+
+When either condition is detected:
+- The error type is recorded in `ErrorFlag` / `Error description` columns of the CSV
+- A **`⚠ Measurement Data Error`** banner is overlaid in the title area of the output PNG
+- The die is excluded from wafer-level statistical comparisons (heatmap, boxplot)
+
+Both error types are independently flagged so they can be distinguished in the output.
 
 ---
 
