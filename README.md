@@ -8,7 +8,7 @@
 
 ---
 
-## 1. The Problem We Solve *(Presenter: Team Lead)*
+## 1. The Problem We Solve
 
 In silicon photonics fabrication, a single wafer holds dozens of optical device dies, and each die produces its own XML measurement file. Manually opening these files, plotting graphs, and extracting parameters is **time-consuming and error-prone.**
 
@@ -30,7 +30,7 @@ Thanks to ⑤, the pipeline **clearly distinguishes code errors from measurement
 
 ---
 
-## 2. Project Structure *(Presenter: Team Lead)*
+## 2. Project Structure
 
 From one input XML to PNG/CSV output, each module owns **a single responsibility.**
 
@@ -81,7 +81,7 @@ project/
 
 ---
 
-## 3. Analysis Models *(Presenter: Member 1)*
+## 3. Analysis Models
 
 ### GPDO — Parameter Extraction
 
@@ -193,7 +193,7 @@ Both error types are independently flagged so they can be distinguished in the o
 
 ---
 
-## 5. How to Run — Reproducibility Guide *(Presenter: Member 2)*
+## 5. How to Run — Reproducibility Guide
 
 ### 5-1. Installation
 
@@ -260,7 +260,7 @@ Open `Jupyter Notebook.ipynb` and run cells in order to walk through parsing, fi
 
 ---
 
-## 6. What the Results Mean *(Presenter: Member 2)*
+## 6. What the Results Mean
 
 | Output | Meaning |
 |--------|---------|
