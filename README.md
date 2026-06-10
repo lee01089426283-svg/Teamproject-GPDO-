@@ -184,6 +184,15 @@ Both error types are independently flagged so they can be distinguished in the o
 
 ---
 
+### Raincloud Boxplots — Cross-Wafer Statistical Comparison
+> KDE density (left) + Boxplot (center) per wafer — error-flagged dies excluded
+
+| GPDO — Responsivity [A/W] | MZM (LMZC) — Extinction Ratio [dB] |
+|:---:|:---:|
+| ![GPDO Responsivity Boxplot](docs/screenshots/boxplot_GPDO_Responsivity.png) | ![LMZC ER Boxplot](docs/screenshots/boxplot_LMZC_ExtinctionRatio.png) |
+
+---
+
 ## 5. How to Run — Reproducibility Guide
 
 ### 5-1. Installation
