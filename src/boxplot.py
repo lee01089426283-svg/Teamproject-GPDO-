@@ -91,7 +91,7 @@ def _raincloud_ax(ax, data_by_wafer: dict, ylabel: str, title: str = '') -> None
         except Exception:
             pass
 
-        # 스트립 플롯 제거 (KDE + 박스플롯만 표시)
+        # ── jitter 제거 (다이 좌표 scatter는 별도 axes에서 표시) ──
 
     ax.set_xticks(positions)
     ax.set_xticklabels(wafers)
@@ -147,7 +147,18 @@ def _raincloud_broken_y_fig(data_by_wafer: dict,
 
     _raincloud_ax(ax, low_data_by_wafer, ylabel, title)
 
-    # 스트립 플롯 제거 (KDE + 박스플롯만 표시)
+    wafers = [w for w, v in data_by_wafer.items() if len(v) >= 2]
+    rng = np.random.default_rng(42)
+    for i, wafer in enumerate(wafers):
+        vals = np.asarray(data_by_wafer[wafer], dtype=float)
+        vals = vals[np.isfinite(vals) & (vals >= break_hi)]
+        if len(vals) == 0:
+            continue
+        jitter = rng.uniform(-0.08, 0.08, size=len(vals))
+        color = PALETTE.get(wafer, DEFAULT_COLOR)
+        ax.scatter(i + 0.25 + jitter, compress_y(vals),
+                   color=color, s=18, alpha=0.65,
+                   edgecolors='none', zorder=3)
 
     bottom_lo, _ = _padded_limits(low_vals, (break_lo - 0.2, break_lo))
     _, high_top = _padded_limits(high_vals, (break_hi, break_hi + 0.2))
@@ -170,22 +181,61 @@ def _raincloud_broken_y_fig(data_by_wafer: dict,
     return fig, ax
 
 
+
+
+def _scatter_ax(ax, data_by_wafer: dict, coords_by_wafer: dict,
+                ylabel: str, title: str = '') -> None:
+    """
+    다이 좌표 기반 scatter plot.
+    coords_by_wafer: {'D08': [(col,row), ...], ...}
+    data_by_wafer:   {'D08': array, ...}
+    """
+    wafers = [w for w, v in data_by_wafer.items() if len(v) >= 2]
+    if not wafers:
+        ax.text(0.5, 0.5, 'No data', ha='center', va='center',
+                transform=ax.transAxes, color='gray')
+        return
+
+    all_labels = []
+    for wafer in wafers:
+        coords = coords_by_wafer.get(wafer, [])
+        vals   = data_by_wafer[wafer]
+        color  = PALETTE.get(wafer, DEFAULT_COLOR)
+        labels = [f"({c},{r})" for c, r in coords] if coords else [str(j+1) for j in range(len(vals))]
+        for j, (lbl, v) in enumerate(zip(labels, vals)):
+            if lbl not in all_labels:
+                all_labels.append(lbl)
+            xi = all_labels.index(lbl)
+            ax.scatter(xi, v, color=color, s=30, alpha=0.75,
+                       edgecolors=color, linewidths=0.5, zorder=3,
+                       label=wafer if j == 0 else '_nolegend_')
+
+    ax.set_xticks(range(len(all_labels)))
+    ax.set_xticklabels(all_labels, rotation=45, ha='right', fontsize=7)
+    ax.set_ylabel(ylabel, fontsize=9)
+    ax.set_xlabel('Die (col, row)', fontsize=9)
+    if title:
+        ax.set_title(title, fontweight='bold', fontsize=10)
+    ax.grid(axis='y', alpha=0.25)
+    ax.legend(fontsize=8, loc='upper right')
+
 # ══════════════════════════════════════════════════════════
 # 공개 API
 # ══════════════════════════════════════════════════════════
 
 def generate_boxplots(project_name: str,
-                      gpdo_csv: str,
-                      mzm_csv: str,
-                      gpdo_out_dir: str,
-                      mzm_out_dir: str) -> list[str]:
-    ...
-    os.makedirs(gpdo_out_dir, exist_ok=True)
-    os.makedirs(mzm_out_dir,  exist_ok=True)
+                      gpdo_csv: str | None,
+                      mzm_csv: str | None,
+                      gpdo_out_dir: str | None,
+                      mzm_out_dir: str | None) -> list[str]:
+    if gpdo_out_dir:
+        os.makedirs(gpdo_out_dir, exist_ok=True)
+    if mzm_out_dir:
+        os.makedirs(mzm_out_dir, exist_ok=True)
     saved = []
 
     # ── GPDO ──────────────────────────────────────────
-    if os.path.isfile(gpdo_csv):
+    if gpdo_csv and gpdo_out_dir and os.path.isfile(gpdo_csv):
         gdf = pd.read_csv(gpdo_csv)
         wafers = sorted(gdf['wafer_id'].unique()) if 'wafer_id' in gdf.columns else []
 
@@ -201,20 +251,29 @@ def generate_boxplots(project_name: str,
             if not data_by_wafer:
                 continue
 
-            fig, ax = plt.subplots(figsize=(max(4, len(data_by_wafer) * 1.8), 5))
-            _raincloud_ax(ax, data_by_wafer, ylabel,
+            # 다이 좌표 수집
+            coords_by_wafer = {}
+            for w in wafers:
+                sub = gdf[gdf['wafer_id'] == w][['col', 'row', col]].dropna()
+                coords_by_wafer[w] = list(zip(sub['col'].astype(int), sub['row'].astype(int)))
+                data_by_wafer[w] = sub[col].values.astype(float)
+
+            fig, axes = plt.subplots(1, 2, figsize=(max(8, len(data_by_wafer) * 3.5), 5))
+            _raincloud_ax(axes[0], data_by_wafer, ylabel,
                           f'GPDO — {ylabel}  [{project_name}]')
+            _scatter_ax(axes[1], data_by_wafer, coords_by_wafer,
+                        ylabel, f'GPDO — {ylabel} per Die  [{project_name}]')
             plt.tight_layout()
             fpath = os.path.join(gpdo_out_dir, f'{stem}.png')
             fig.savefig(fpath, dpi=150, bbox_inches='tight')
             plt.close(fig)
             saved.append(fpath)
             print(f'       [Boxplot] 저장: {fpath}')
-    else:
+    elif gpdo_csv:
         print(f'       [Boxplot] GPDO CSV 없음: {gpdo_csv}')
 
     # ── MZM (LMZC / LMZO 분리) ────────────────────────
-    if os.path.isfile(mzm_csv):
+    if mzm_csv and mzm_out_dir and os.path.isfile(mzm_csv):
         mdf = pd.read_csv(mzm_csv)
         if 'ErrorFlag' in mdf.columns:
             before = len(mdf)
@@ -247,17 +306,22 @@ def generate_boxplots(project_name: str,
                 if not data_by_wafer:
                     continue
 
-                figsize = (max(4, len(data_by_wafer) * 1.8), 5)
+                # 다이 좌표 수집
+                coords_by_wafer_mzm = {}
+                for w in wafers:
+                    if wafer_col:
+                        sub = sub_df[sub_df[wafer_col] == w][['Row', 'Column', col]].dropna()
+                        coords_by_wafer_mzm[w] = list(zip(sub['Column'].astype(int), sub['Row'].astype(int)))
+                        data_by_wafer[w] = sub[col].values.astype(float)
+                    else:
+                        coords_by_wafer_mzm[w] = []
+
+                figsize = (max(8, len(data_by_wafer) * 3.5), 5)
                 title = f'{dtype_label} — {ylabel}  [{project_name}]'
-                if dtype_label == 'LMZO' and col == 'Ideality Factor':
-                    fig, _ = _raincloud_broken_y_fig(
-                        data_by_wafer, ylabel, title,
-                        break_range=(1.55, 2.15),
-                        figsize=figsize,
-                    )
-                else:
-                    fig, ax = plt.subplots(figsize=figsize)
-                    _raincloud_ax(ax, data_by_wafer, ylabel, title)
+                fig, axes = plt.subplots(1, 2, figsize=figsize)
+                _raincloud_ax(axes[0], data_by_wafer, ylabel, title)
+                _scatter_ax(axes[1], data_by_wafer, coords_by_wafer_mzm,
+                            ylabel, f'{dtype_label} — {ylabel} per Die  [{project_name}]')
 
                 plt.tight_layout()
                 fpath = os.path.join(mzm_out_dir, f'{stem}.png')
@@ -265,7 +329,7 @@ def generate_boxplots(project_name: str,
                 plt.close(fig)
                 saved.append(fpath)
                 print(f'       [Boxplot] 저장: {fpath}')
-    else:
+    elif mzm_csv:
         print(f'       [Boxplot] MZM CSV 없음: {mzm_csv}')
 
     return saved
