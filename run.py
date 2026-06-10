@@ -117,14 +117,14 @@ def main(targets: list[str] | None = None) -> dict[str, dict[str, list]]:
     if "MZM" in targets:
         mzm_save_total(verbose=True)
 
-    # Boxplot (Raincloud) — CSV 생성 후 한 번만
+    # Boxplot (Raincloud) — 실행된 디바이스만
     print(f"\n{'='*60}")
     print("  📊 Boxplot (Raincloud) 생성 중...")
     print(f"{'='*60}")
-    gpdo_total = os.path.join(RES_DIR, "csv", "GPDO", project_name, "Total_Result.csv")
-    mzm_total  = os.path.join(RES_DIR, "csv", "MZM",  project_name, "Total_Result.csv")
-    gpdo_bp_dir = os.path.join(RES_DIR, "png", "GPDO", project_name, "Total")
-    mzm_bp_dir = os.path.join(RES_DIR, "png", "MZM", project_name, "Total")
+    gpdo_total  = os.path.join(RES_DIR, "csv", "GPDO", project_name, "Total_Result.csv") if "GPDO" in targets else None
+    mzm_total   = os.path.join(RES_DIR, "csv", "MZM",  project_name, "Total_Result.csv") if "MZM"  in targets else None
+    gpdo_bp_dir = os.path.join(RES_DIR, "png", "GPDO", project_name, "Total")            if "GPDO" in targets else None
+    mzm_bp_dir  = os.path.join(RES_DIR, "png", "MZM",  project_name, "Total")            if "MZM"  in targets else None
     generate_boxplots(project_name, gpdo_total, mzm_total, gpdo_bp_dir, mzm_bp_dir)
 
     print(f"\n{'='*60}")
