@@ -200,10 +200,8 @@ Both error types are independently flagged so they can be distinguished in the o
 ```bash
 git clone https://github.com/H1SKIM/Teamproject-GPDO-.git
 cd "Teamproject-GPDO-"
-pip install -r requirements.txt
+pip install numpy scipy matplotlib pandas lxml
 ```
-
-> If `requirements.txt` is unavailable: `pip install numpy scipy matplotlib pandas lxml`
 
 ### 5-2. Place Measurement Data
 
@@ -330,19 +328,15 @@ DEVICE_CONFIG = {
 
 ---
 
-## 9. Team Roles
+## 9. Environment
 
-| Member | Responsibility | Presentation |
-|--------|----------------|--------------|
-| **Team Lead** | Problem definition · project structure · module design | §1–2 |
-| **Member 1** | Parsing/fitting algorithms · quality-check implementation | §3 |
-| **Member 2** | Notebook execution · result visualization · interpretation | §5–6 |
-
----
-
-## Environment
-
-- Python 3.10 or higher
-- `numpy` `scipy` `matplotlib` `pandas` `lxml`
+| Package | Version |
+|---------|---------|
+| Python | 3.10+ |
+| numpy | 2.4.4 |
+| scipy | 1.17.1 |
+| matplotlib | 3.10.9 |
+| pandas | 3.0.2 |
+| lxml | 6.1.1 |
 
 **Project Link:** [https://github.com/H1SKIM/Teamproject-GPDO-](https://github.com/H1SKIM/Teamproject-GPDO-)
