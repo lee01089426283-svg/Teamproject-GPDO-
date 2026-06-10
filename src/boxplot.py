@@ -224,17 +224,18 @@ def _scatter_ax(ax, data_by_wafer: dict, coords_by_wafer: dict,
 # ══════════════════════════════════════════════════════════
 
 def generate_boxplots(project_name: str,
-                      gpdo_csv: str,
-                      mzm_csv: str,
-                      gpdo_out_dir: str,
-                      mzm_out_dir: str) -> list[str]:
-    ...
-    os.makedirs(gpdo_out_dir, exist_ok=True)
-    os.makedirs(mzm_out_dir,  exist_ok=True)
+                      gpdo_csv: str | None,
+                      mzm_csv: str | None,
+                      gpdo_out_dir: str | None,
+                      mzm_out_dir: str | None) -> list[str]:
+    if gpdo_out_dir:
+        os.makedirs(gpdo_out_dir, exist_ok=True)
+    if mzm_out_dir:
+        os.makedirs(mzm_out_dir, exist_ok=True)
     saved = []
 
     # ── GPDO ──────────────────────────────────────────
-    if os.path.isfile(gpdo_csv):
+    if gpdo_csv and gpdo_out_dir and os.path.isfile(gpdo_csv):
         gdf = pd.read_csv(gpdo_csv)
         wafers = sorted(gdf['wafer_id'].unique()) if 'wafer_id' in gdf.columns else []
 
@@ -268,11 +269,11 @@ def generate_boxplots(project_name: str,
             plt.close(fig)
             saved.append(fpath)
             print(f'       [Boxplot] 저장: {fpath}')
-    else:
+    elif gpdo_csv:
         print(f'       [Boxplot] GPDO CSV 없음: {gpdo_csv}')
 
     # ── MZM (LMZC / LMZO 분리) ────────────────────────
-    if os.path.isfile(mzm_csv):
+    if mzm_csv and mzm_out_dir and os.path.isfile(mzm_csv):
         mdf = pd.read_csv(mzm_csv)
         if 'ErrorFlag' in mdf.columns:
             before = len(mdf)
@@ -328,7 +329,7 @@ def generate_boxplots(project_name: str,
                 plt.close(fig)
                 saved.append(fpath)
                 print(f'       [Boxplot] 저장: {fpath}')
-    else:
+    elif mzm_csv:
         print(f'       [Boxplot] MZM CSV 없음: {mzm_csv}')
 
     return saved
