@@ -36,7 +36,6 @@ project/
 ├── run.py                    # Entry point — select device via CLI args
 ├── config.py                 # Path / wafer / device settings (DEVICE_CONFIG)
 ├── Jupyter Notebook.ipynb    # Notebook for execution & result review
-├── requirements.txt          # Pinned dependency versions
 │
 ├── data/                     # Raw XML measurement data (Git-ignored — see §4)
 ├── res/                      # Analysis output PNG/CSV (Git-ignored, generated at runtime)
