@@ -19,15 +19,6 @@ This project automates the entire workflow — parsing → fitting → visualiza
 | **GPDO** | Germanium Photodetector | Photocurrent Iph, ideality factor n, responsivity R, peak wavelength |
 | **MZM** | Mach-Zehnder Modulator (LMZC / LMZO) | Extinction ratio ER, FSR, I–V characteristics |
 
-### Requirements — Client Requests + Engineer-Added Items
-
-| Category | Items |
-|----------|-------|
-| **Client Requirements** | ① XML parsing  ② Physical-model fitting  ③ Per-die graphs  ④ CSV export |
-| **Additional Design** | ⑤ Measurement-data quality check (auto-detects probe failures, etc.) <br> ⑥ Device-extension structure (add devices without rewriting code) |
-
-Thanks to ⑤, the pipeline **clearly distinguishes code errors from measurement-data errors**, and faulty dies are automatically excluded from statistics.
-
 ---
 
 ## 2. Project Structure
